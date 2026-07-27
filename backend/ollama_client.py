@@ -268,6 +268,37 @@ def parse_loose_menu_extraction(parsed: Any) -> MenuExtraction:
     )
 
 
+def _post_to_gemini(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout: int = 60) -> requests.Response:
+    import time
+    max_retries = 3
+    retry_delay = 3.0  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            if response.status_code == 429:
+                print(f"Gemini API rate limit (429) hit. Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
+                time.sleep(retry_delay)
+                retry_delay *= 1.5
+                continue
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            if attempt == max_retries - 1:
+                raise
+            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 429:
+                print(f"Gemini API rate-limited (429): retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                retry_delay *= 1.5
+                continue
+            print(f"Transient error querying Gemini API: {e}. Retrying in {retry_delay}s...")
+            time.sleep(retry_delay)
+            retry_delay *= 1.5
+            
+    # Final fallback attempt
+    return requests.post(url, json=payload, headers=headers, timeout=timeout)
+
+
 def extract_from_text_with_ollama(text: str, model: Optional[str] = None, api_key: Optional[str] = None, bypass_to_gemini: bool = True) -> MenuExtraction:
     active_key = (api_key or GEMINI_API_KEY) if bypass_to_gemini else None
     prompt_with_mem = _get_prompt_with_memory()
@@ -284,8 +315,7 @@ def extract_from_text_with_ollama(text: str, model: Optional[str] = None, api_ke
             }
         }
         headers = {"Content-Type": "application/json"}
-        response = requests.post(url, json=payload, headers=headers, timeout=60)
-        response.raise_for_status()
+        response = _post_to_gemini(url, payload, headers, timeout=60)
         res_data = response.json()
         try:
             raw = res_data["candidates"][0]["content"]["parts"][0]["text"]
@@ -338,8 +368,7 @@ def extract_from_image_with_ollama(image_path: str | Path, model: Optional[str] 
             }
         }
         headers = {"Content-Type": "application/json"}
-        response = requests.post(url, json=payload, headers=headers, timeout=60)
-        response.raise_for_status()
+        response = _post_to_gemini(url, payload, headers, timeout=60)
         res_data = response.json()
         try:
             raw = res_data["candidates"][0]["content"]["parts"][0]["text"]
@@ -389,8 +418,7 @@ def extract_from_text_with_gemini(text: str, api_key: Optional[str] = None) -> M
     }
     
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers, timeout=120)
-    response.raise_for_status()
+    response = _post_to_gemini(url, payload, headers, timeout=120)
     res_data = response.json()
     try:
         raw = res_data["candidates"][0]["content"]["parts"][0]["text"]
@@ -435,8 +463,7 @@ def extract_from_images_with_gemini(image_paths: List[str | Path], api_key: Opti
     }
     
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers, timeout=120)
-    response.raise_for_status()
+    response = _post_to_gemini(url, payload, headers, timeout=120)
     res_data = response.json()
     try:
         raw = res_data["candidates"][0]["content"]["parts"][0]["text"]

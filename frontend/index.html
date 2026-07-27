@@ -89,9 +89,9 @@
                     <div class="dash-welcome-card glassmorphic">
                         <div class="welcome-text">
                             <h3>Digitize Restaurant Menus with 100% Accuracy</h3>
-                            <p>Upload files (Images, PDFs, Word, Excel). The ShopVerse Agent uses local LLMs to parse
-                                categories, variations, and prices. Complete the 6-stage review to export approved
-                                ShopVerse Upload sheets.</p>
+                            <p>Upload files (Images, PDFs, Word, Excel). The Menu Ninja Agent uses LLMs to parse
+                                categories, variations, and prices. Complete the review steps to export approved
+                                Menu Ninja sheets.</p>
                         </div>
                         <button class="primary-btn animate-pulse" onclick="switchView('create')">
                             <i class="fa-solid fa-file-arrow-up"></i> Start New Extraction
@@ -370,7 +370,7 @@
                             <div class="menu-preview-layout glassmorphic">
                                 <div class="menu-preview-header">
                                     <h2 id="preview-menu-business">Restaurant Menu</h2>
-                                    <span>Digitized via ShopVerse POS Agent</span>
+                                    <span>Digitized via Menu Ninja by Naman Kshetri</span>
                                 </div>
                                 <div class="menu-preview-body" id="menu-preview-container">
                                     <!-- Structured food menu layout -->
@@ -390,7 +390,8 @@
 
                                 <div class="approval-agreement-card glassmorphic">
                                     <h3>Final Approval Signature</h3>
-                                    <p>You are authorizing the creation of the official ShopVerse Excel Upload workbook.
+                                    <p>You are authorizing the creation of the official Menu Ninja Excel Upload
+                                        workbook.
                                         Please double check that you have verified all prices and variations.</p>
 
                                     <label class="checkbox-container lg-checkbox">
@@ -398,14 +399,14 @@
                                             onchange="toggleFinalExportButton()">
                                         <span class="checkmark"></span>
                                         <strong>I have reviewed the categories, item names, prices, variations and
-                                            mandatory fields, and I approve this menu for ShopVerse bulk
+                                            mandatory fields, and I approve this menu for Menu Ninja bulk
                                             upload.</strong>
                                     </label>
 
                                     <div class="export-actions">
                                         <button class="primary-btn xl-btn" id="final-export-xlsx-btn" disabled
                                             onclick="approveAndDownloadExcel()">
-                                            <i class="fa-solid fa-file-excel"></i> Generate & Download ShopVerse Excel
+                                            <i class="fa-solid fa-file-excel"></i> Generate & Download Menu Ninja Excel
                                             File
                                         </button>
                                     </div>
@@ -415,7 +416,7 @@
                                     style="display: none;">
                                     <div class="success-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
                                     <h3>Bulk Upload Files Generated Successfully!</h3>
-                                    <p>Your shopverse excel sheets and validation review summaries are ready for
+                                    <p>Your Menu Ninja excel sheets and validation review summaries are ready for
                                         integration.</p>
                                     <div class="download-links-area">
                                         <a href="" id="link-excel-download" class="download-btn xlsx" download><i

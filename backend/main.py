@@ -46,7 +46,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 FRONTEND_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="ShopVerse Menu Creation Agent", version="1.0.0")
+app = FastAPI(title="Menu Ninja Menu Agent by Naman Kshetri", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -418,7 +418,7 @@ async def create_new_draft(
         update_draft_item(draft_id, v_item["id"], v_item, user="AI Extractor")
         
     if direct_approve:
-        output_filename = f"ShopVerse_Menu_Bulk_Upload_{business_name.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        output_filename = f"Menu_Ninja_Bulk_Upload_{business_name.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx"
         output_path = OUTPUT_DIR / output_filename
         
         # update draft details status to Approved
@@ -671,7 +671,7 @@ def download_file(filename: str):
 def index():
     index_file = FRONTEND_DIR / "index.html"
     if not index_file.exists():
-        return {"message": "ShopVerse Frontend files not found. Creating interface structure..."}
+        return {"message": "Menu Ninja Frontend files not found. Creating interface structure..."}
     return FileResponse(str(index_file))
 
 # Mount static frontend directory
@@ -688,7 +688,7 @@ def run_cli(input_file: str, template: str, output: str, review: Optional[str] =
         print(f"Review JSON: {review}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Extract menu and create ShopVerse bulk upload XLSX.")
+    parser = argparse.ArgumentParser(description="Extract menu and create Menu Ninja bulk upload XLSX.")
     parser.add_argument("--input", required=True, help="Menu file path: image/pdf/docx/xlsx/csv/txt")
     parser.add_argument("--template", required=True, help="Bulk upload template XLSX path")
     parser.add_argument("--output", required=True, help="Output XLSX path")

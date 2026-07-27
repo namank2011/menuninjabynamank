@@ -4,13 +4,15 @@
     const API_BASE = "https://menuninjabynamank.onrender.com";
     window.fetch = function (url, options) {
         if (typeof url === 'string' && url.startsWith('/api')) {
-            url = API_BASE + url;
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                url = API_BASE + url;
+            }
         }
         return originalFetch(url, options);
     };
 })();
 
-// ShopVerse Menu Digitizer Frontend SPA State
+// Menu Ninja Menu Digitizer Frontend SPA State
 let currentView = 'dashboard';
 let currentDraftId = null;
 let currentDraft = null; // Holds the active draft data { id, businessName, defaults, files, items, status }
@@ -1148,7 +1150,7 @@ function toggleFinalExportButton() {
 async function approveAndDownloadExcel() {
     const btn = document.getElementById('final-export-xlsx-btn');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Finalizing ShopVerse Document...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Finalizing Menu Ninja Document...`;
 
     // Save changes first
     await saveDraftProgress(true);
@@ -1182,12 +1184,12 @@ async function approveAndDownloadExcel() {
             alert('Excel file and review reports successfully generated! Select download links below.');
         } else {
             alert('Approval failed: ' + (res.error || 'Unknown error'));
-            btn.innerHTML = `<i class="fa-solid fa-file-excel"></i> Generate & Download ShopVerse Excel File`;
+            btn.innerHTML = `<i class="fa-solid fa-file-excel"></i> Generate & Download Menu Ninja Excel File`;
             btn.disabled = false;
         }
     } catch (e) {
         alert('Network request error: ' + e.message);
-        btn.innerHTML = `<i class="fa-solid fa-file-excel"></i> Generate & Download ShopVerse Excel File`;
+        btn.innerHTML = `<i class="fa-solid fa-file-excel"></i> Generate & Download Menu Ninja Excel File`;
         btn.disabled = false;
     }
 }
