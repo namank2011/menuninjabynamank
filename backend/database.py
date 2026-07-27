@@ -131,7 +131,11 @@ def init_db():
 
 def execute_query(query: str, params: tuple = (), commit: bool = False) -> List[tuple]:
     conn = get_db_connection()
-    is_postgres = DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
+    is_postgres = False
+    try:
+        is_postgres = "psycopg2" in str(type(conn))
+    except Exception:
+        pass
     
     if is_postgres:
         query = query.replace("?", "%s")

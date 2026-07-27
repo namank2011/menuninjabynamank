@@ -47,6 +47,20 @@ FRONTEND_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="ShopVerse Menu Creation Agent", version="1.0.0")
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    error_msg = f"{type(exc).__name__}: {str(exc)}"
+    print(f"[Unhandled Exception] {error_msg}\n{traceback.format_exc()}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "message": error_msg,
+            "traceback": traceback.format_exc().splitlines()
+        }
+    )
+
 @app.on_event("startup")
 def startup_event():
     # Initialize SQLite database schema
