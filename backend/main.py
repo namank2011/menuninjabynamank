@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, File, Form, UploadFile, Query, Body, Header
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -46,6 +47,14 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 FRONTEND_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="ShopVerse Menu Creation Agent", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
