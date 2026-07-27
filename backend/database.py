@@ -13,24 +13,50 @@ def get_db_connection():
     if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL):
         try:
             import psycopg2
-            return psycopg2.connect(DATABASE_URL)
-        except ImportError:
-            print("[Warning] psycopg2 not installed. Falling back to SQLite.")
+            # Set a 5-second timeout on connections to prevent hanging on startup
+            return psycopg2.connect(DATABASE_URL, connect_timeout=5)
+        except Exception as e:
+            print(f"[Error] Failed to connect to PostgreSQL: {e}. Falling back to SQLite.")
     
-    DB_FILE.parent.mkdir(exist_ok=True)
+    try:
+        DB_FILE.parent.mkdir(exist_ok=True)
+    except Exception:
+        pass
     return sqlite3.connect(str(DB_FILE))
 
 def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    is_postgres = DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
-    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+    except Exception as e:
+        print(f"[Critical Error] Failed to establish initial database connection: {e}. Falling back to SQLite.")
+        try:
+            conn = sqlite3.connect("shopverse_agent.db")
+            cursor = conn.cursor()
+        except Exception as ex:
+            print(f"[Fatal] Backup SQLite also failed: {ex}")
+            return
+
+    is_postgres = False
+    try:
+        # Check if the connection is postgres
+        is_postgres = hasattr(conn, 'closed') and not hasattr(conn, 'row_factory')
+    except Exception:
+        pass
+
     def run_ddl(sql: str):
-        if is_postgres:
-            sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
-            sql = sql.replace("REAL", "DOUBLE PRECISION")
-        cursor.execute(sql)
+        try:
+            if is_postgres:
+                sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+                sql = sql.replace("REAL", "DOUBLE PRECISION")
+            cursor.execute(sql)
+        except Exception as ddl_err:
+            print(f"[DDL Error] Failed executing statement: {sql[:100]}... Error: {ddl_err}")
+            # Try to roll back to keep connection active
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         
     # Drafts Table
     run_ddl("""
