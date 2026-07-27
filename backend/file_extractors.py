@@ -903,9 +903,12 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                 return extract_from_images_with_gemini([temp_path], api_key=gemini_key)
             except Exception as e:
                 if engine == "gemini":
-                    raise ValueError(f"Forced Gemini extraction failed: {e}")
-                print(f"Gemini Vision failed, trying Ollama: {e}")
-                use_ollama = True
+                    print(f"Forced Gemini extraction failed (429/quota/network): {e}. Gracefully falling back to local Heuristics OCR...")
+                    use_heuristics = True
+                    gemini_failed_note = f"[IMPORTANT] Forced Gemini extraction failed: {e}. Automatically fell back to local OCR + Heuristics."
+                else:
+                    print(f"Gemini Vision failed, trying Ollama: {e}")
+                    use_ollama = True
                 
         if use_ollama:
             print("Force/Auto Ollama vision model for image extraction...")
@@ -913,19 +916,27 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                 return extract_from_image_with_ollama(temp_path, api_key=gemini_key, bypass_to_gemini=(engine != "ollama"))
             except Exception as e:
                 if engine == "ollama":
-                    raise ValueError(f"Forced Ollama extraction failed: {e}")
-                print(f"Ollama Vision failed: {e}. Falling back to local RapidOCR + Heuristics...")
-                use_heuristics = True
+                    print(f"Forced Ollama extraction failed: {e}. Gracefully falling back to local Heuristics OCR...")
+                    use_heuristics = True
+                    ollama_failed_note = f"[IMPORTANT] Forced Ollama extraction failed: {e}. Automatically fell back to local OCR + Heuristics."
+                else:
+                    print(f"Ollama Vision failed: {e}. Falling back to local RapidOCR + Heuristics...")
+                    use_heuristics = True
                 
         if use_heuristics:
             print("Using local RapidOCR + Heuristics for image extraction...")
             ocr_text = extract_text_from_image_via_ocr(temp_path)
+            extracted = MenuExtraction(currency="INR", items=[], document_notes=["Heuristic extraction failed to find items."])
             if ocr_text.strip():
                 heur = parse_menu_text_heuristically(ocr_text)
                 if heur and heur.items:
                     print(f"Processed via local OCR + Heuristics: {len(heur.items)} items.")
-                    return heur
-            return MenuExtraction(currency="INR", items=[], document_notes=["Heuristic extraction failed to find items."])
+                    extracted = heur
+            if 'gemini_failed_note' in locals():
+                extracted.document_notes.append(gemini_failed_note)
+            if 'ollama_failed_note' in locals():
+                extracted.document_notes.append(ollama_failed_note)
+            return extracted
 
     # 3. PDF: use embedded text when available; scanned PDF fallback goes page-by-page.
     if suffix == ".pdf":
@@ -958,9 +969,12 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                     return extract_from_text_with_gemini(text, api_key=gemini_key)
                 except Exception as e:
                     if engine == "gemini":
-                        raise ValueError(f"Forced Gemini extraction failed: {e}")
-                    print(f"Gemini text extraction failed: {e}. Trying Ollama...")
-                    use_ollama = True
+                        print(f"Forced Gemini text extraction failed: {e}. Gracefully falling back to local Heuristics...")
+                        use_heuristics = True
+                        gemini_failed_note = f"[IMPORTANT] Forced Gemini extraction failed: {e}. Automatically fell back to local Heuristics."
+                    else:
+                        print(f"Gemini text extraction failed: {e}. Trying Ollama...")
+                        use_ollama = True
             if use_ollama:
                 try:
                     print("Using Ollama for text PDF extraction...")
@@ -969,15 +983,23 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
-                        raise ValueError(f"Forced Ollama extraction failed: {e}")
-                    print(f"Ollama text extraction failed: {e}. Falling back to Heuristics...")
-                    use_heuristics = True
+                        print(f"Forced Ollama text extraction failed: {e}. Gracefully falling back to local Heuristics...")
+                        use_heuristics = True
+                        ollama_failed_note = f"[IMPORTANT] Forced Ollama extraction failed: {e}. Automatically fell back to local Heuristics."
+                    else:
+                        print(f"Ollama text extraction failed: {e}. Falling back to Heuristics...")
+                        use_heuristics = True
             if use_heuristics:
                 print("Using local Heuristics for PDF text extraction...")
+                extracted = MenuExtraction(currency="INR", items=[], document_notes=["Local heuristics failed to extract menu items from text."])
                 heur = parse_menu_text_heuristically(text)
                 if heur and heur.items:
-                    return heur
-                return MenuExtraction(currency="INR", items=[], document_notes=["Local heuristics failed to extract menu items from text."])
+                    extracted = heur
+                if 'gemini_failed_note' in locals():
+                    extracted.document_notes.append(gemini_failed_note)
+                if 'ollama_failed_note' in locals():
+                    extracted.document_notes.append(ollama_failed_note)
+                return extracted
         else:
             # Scanned PDF: page-by-page vision
             image_paths = _pdf_pages_to_images(path, max_pages=10)
@@ -987,9 +1009,12 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                     return extract_from_images_with_gemini(image_paths, api_key=gemini_key)
                 except Exception as e:
                     if engine == "gemini":
-                        raise ValueError(f"Forced Gemini extraction failed: {e}")
-                    print(f"Gemini scanned PDF vision failed: {e}. Trying Ollama...")
-                    use_ollama = True
+                        print(f"Forced Gemini scanned PDF extraction failed: {e}. Gracefully falling back to local OCR + Heuristics...")
+                        use_heuristics = True
+                        gemini_failed_note = f"[IMPORTANT] Forced Gemini extraction failed: {e}. Automatically fell back to local OCR + Heuristics."
+                    else:
+                        print(f"Gemini scanned PDF vision failed: {e}. Trying Ollama...")
+                        use_ollama = True
             if use_ollama:
                 try:
                     print("Using Ollama for scanned PDF vision extraction...")
@@ -997,20 +1022,28 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
-                        raise ValueError(f"Forced Ollama extraction failed: {e}")
-                    print(f"Ollama scanned PDF vision failed: {e}. Falling back to Local OCR...")
-                    use_heuristics = True
+                        print(f"Forced Ollama scanned PDF extraction failed: {e}. Gracefully falling back to local OCR + Heuristics...")
+                        use_heuristics = True
+                        ollama_failed_note = f"[IMPORTANT] Forced Ollama extraction failed: {e}. Automatically fell back to local OCR + Heuristics."
+                    else:
+                        print(f"Ollama scanned PDF vision failed: {e}. Falling back to Local OCR...")
+                        use_heuristics = True
             if use_heuristics:
                 print("Using local OCR + Heuristics for scanned PDF...")
                 ocr_texts = []
+                extracted = MenuExtraction(currency="INR", items=[], document_notes=["Local OCR + Heuristics failed to extract menu items from scanned PDF."])
                 for img_path in image_paths:
                     ocr_texts.append(extract_text_from_image_via_ocr(img_path))
                 combined_text = "\n".join(ocr_texts)
                 if combined_text.strip():
                     heur = parse_menu_text_heuristically(combined_text)
                     if heur and heur.items:
-                        return heur
-                return MenuExtraction(currency="INR", items=[], document_notes=["Local OCR + Heuristics failed to extract menu items from scanned PDF."])
+                        extracted = heur
+                if 'gemini_failed_note' in locals():
+                    extracted.document_notes.append(gemini_failed_note)
+                if 'ollama_failed_note' in locals():
+                    extracted.document_notes.append(ollama_failed_note)
+                return extracted
 
     # 4. Word/Text: convert to clean text and send chunked to AI text model.
     text = extract_plain_text_from_file(path)
@@ -1041,9 +1074,12 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
             return extract_from_text_with_gemini(text, api_key=gemini_key)
         except Exception as e:
             if engine == "gemini":
-                raise ValueError(f"Forced Gemini extraction failed: {e}")
-            print(f"Gemini Word/Text extraction failed: {e}. Trying Ollama...")
-            use_ollama = True
+                print(f"Forced Gemini Word/Text extraction failed: {e}. Gracefully falling back to local Heuristics...")
+                use_heuristics = True
+                gemini_failed_note = f"[IMPORTANT] Forced Gemini extraction failed: {e}. Automatically fell back to local Heuristics."
+            else:
+                print(f"Gemini Word/Text extraction failed: {e}. Trying Ollama...")
+                use_ollama = True
     if use_ollama:
         try:
             print("Using Ollama for Word/Text document extraction...")
@@ -1052,13 +1088,21 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
             return merge_extractions(extractions)
         except Exception as e:
             if engine == "ollama":
-                raise ValueError(f"Forced Ollama extraction failed: {e}")
-            print(f"Ollama Word/Text extraction failed: {e}. Falling back to Heuristics...")
-            use_heuristics = True
+                print(f"Forced Ollama Word/Text extraction failed: {e}. Gracefully falling back to local Heuristics...")
+                use_heuristics = True
+                ollama_failed_note = f"[IMPORTANT] Forced Ollama extraction failed: {e}. Automatically fell back to local Heuristics."
+            else:
+                print(f"Ollama Word/Text extraction failed: {e}. Falling back to Heuristics...")
+                use_heuristics = True
     if use_heuristics:
         print("Using local Heuristics for Word/Text extraction...")
+        extracted = MenuExtraction(currency="INR", items=[], document_notes=["Local heuristics failed to extract menu items from Word/Text file."])
         heur = parse_menu_text_heuristically(text)
         if heur and heur.items:
-            return heur
-        return MenuExtraction(currency="INR", items=[], document_notes=["Local heuristics failed to extract menu items from Word/Text file."])
+            extracted = heur
+        if 'gemini_failed_note' in locals():
+            extracted.document_notes.append(gemini_failed_note)
+        if 'ollama_failed_note' in locals():
+            extracted.document_notes.append(ollama_failed_note)
+        return extracted
 
