@@ -770,7 +770,7 @@ textarea:focus {
 
 .step-indicator {
     align-items: center;
-    background: var(--bg-secondary);
+    background: transparent;
     display: flex;
     flex-direction: column;
     gap: 8px;
