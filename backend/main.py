@@ -25,7 +25,7 @@ if str(backend_dir) not in sys.path:
 
 # Import core modules
 from bulk_writer import write_bulk_upload_excel
-from file_extractors import extract_menu_from_file
+from file_extractors import extract_menu_from_file, SUPPORTED_IMAGE_EXTS
 from database import (
     init_db, create_draft, add_draft_item, get_draft, 
     get_all_drafts, update_draft_item, get_audit_logs, log_audit, delete_draft,
@@ -197,6 +197,8 @@ async def create_new_draft(
     }
     errors_encountered = []
     
+    # Save all uploaded files to disk first
+    saved_paths = []
     for menu_file in menu_files:
         file_path = UPLOAD_DIR / f"{run_id}_{menu_file.filename}"
         with file_path.open("wb") as f:
@@ -210,18 +212,42 @@ async def create_new_draft(
             "timeSeconds": 0.0
         }
         saved_files.append(file_info)
-        
-        # Trigger Ollama/Text extraction
+        saved_paths.append((menu_file, file_path, file_info))
+
+    use_gemini_batch = False
+    gemini_key = x_gemini_api_key or os.getenv("GEMINI_API_KEY")
+    
+    # We can batch together if all files are images and engine supports/favors Gemini
+    all_images = all(p[1].suffix.lower() in SUPPORTED_IMAGE_EXTS for p in saved_paths)
+    if all_images and len(saved_paths) > 1:
+        if extraction_engine == "gemini" or (extraction_engine == "auto" and gemini_key):
+            use_gemini_batch = True
+
+    if use_gemini_batch:
+        print(f"Batching {len(saved_paths)} uploaded images together for unified Gemini extraction...")
         try:
             import time
+            import tempfile
+            from file_extractors import _compress_image_for_vision
+            from ollama_client import extract_from_images_with_gemini
+            
             start_time = time.time()
-            extraction = extract_menu_from_file(file_path, engine=extraction_engine, api_key=x_gemini_api_key)
+            temp_paths = []
+            temp_dir = Path(tempfile.mkdtemp(prefix="menu_imgs_batch_"))
+            for idx, (_, path, _) in enumerate(saved_paths):
+                comp_path = temp_dir / f"input_{idx}.jpg"
+                _compress_image_for_vision(path, comp_path)
+                temp_paths.append(comp_path)
+                
+            extraction = extract_from_images_with_gemini(temp_paths, api_key=gemini_key)
             execution_seconds = time.time() - start_time
-            file_info["timeSeconds"] = round(execution_seconds, 2)
-            print(f"Extraction for {menu_file.filename} took {execution_seconds:.2f} seconds using engine '{extraction_engine}'.")
+            time_per_file = round(execution_seconds / len(saved_paths), 2)
+            
+            for _, _, file_info in saved_paths:
+                file_info["timeSeconds"] = time_per_file
+            print(f"Unified Gemini batch extraction took {execution_seconds:.2f} seconds.")
             
             for page_item in extraction.items:
-                # Map variations
                 variations = []
                 for v in page_item.variations:
                     variations.append({
@@ -233,7 +259,7 @@ async def create_new_draft(
                     
                 mapped_item = {
                     "source": {
-                        "fileName": menu_file.filename,
+                        "fileName": ", ".join(p[0].filename for p in saved_paths),
                         "page": 1,
                         "rawText": page_item.source_text,
                         "confidence": page_item.confidence,
@@ -262,16 +288,81 @@ async def create_new_draft(
                     "approved": True if direct_approve else False
                 }
                 all_extracted_items.append(mapped_item)
+                
+            # Clean up saved files
+            for _, path, _ in saved_paths:
+                if path.exists():
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
         except Exception as err:
-            # We don't want to fail the whole upload if one file fails; log it.
-            print(f"Error extracting from {menu_file.filename}: {err}")
-            errors_encountered.append(f"{menu_file.filename}: {str(err)}")
-        finally:
-            if file_path.exists():
-                try:
-                    os.remove(file_path)
-                except Exception:
-                    pass
+            print(f"Gemini batch extraction failed: {err}. Falling back to sequential extraction...")
+            use_gemini_batch = False
+
+    if not use_gemini_batch:
+        for menu_file, file_path, file_info in saved_paths:
+            # Trigger Ollama/Text extraction
+            try:
+                import time
+                start_time = time.time()
+                extraction = extract_menu_from_file(file_path, engine=extraction_engine, api_key=x_gemini_api_key)
+                execution_seconds = time.time() - start_time
+                file_info["timeSeconds"] = round(execution_seconds, 2)
+                print(f"Extraction for {menu_file.filename} took {execution_seconds:.2f} seconds using engine '{extraction_engine}'.")
+                
+                for page_item in extraction.items:
+                    # Map variations
+                    variations = []
+                    for v in page_item.variations:
+                        variations.append({
+                            "name": v.name,
+                            "sellingPrice": v.price,
+                            "listingPrice": v.listing_price,
+                            "confidence": page_item.confidence
+                        })
+                        
+                    mapped_item = {
+                        "source": {
+                            "fileName": menu_file.filename,
+                            "page": 1,
+                            "rawText": page_item.source_text,
+                            "confidence": page_item.confidence,
+                            "initialCategory": page_item.category or "Uncategorized",
+                            "initialProductName": page_item.product_name
+                        },
+                        "categoryName": page_item.category or "Uncategorized",
+                        "productName": page_item.product_name,
+                        "variantGroupName": "Portion" if any(n.lower() in ["half", "full"] for n in [v["name"] for v in variations]) else ("Size" if len(variations) > 1 else ""),
+                        "variations": variations,
+                        "description": page_item.description or "",
+                        "dietaryTag": page_item.dietary_tag or default_dietary,
+                        "masterStatus": master_status,
+                        "menuStatus": menu_status,
+                        "stockStatus": stock_status,
+                        "itemCode": page_item.item_code or "",
+                        "station": page_item.station or station,
+                        "preparationTime": page_item.preparation_time or preparation_time,
+                        "imageUrl1": page_item.image_url_1 or "",
+                        "imageUrl2": "",
+                        "imageUrl3": "",
+                        "taxCategory": tax_category,
+                        "taxType": tax_type,
+                        "taxValue": tax_value,
+                        "reviewStatus": "Not Reviewed",
+                        "approved": True if direct_approve else False
+                    }
+                    all_extracted_items.append(mapped_item)
+            except Exception as err:
+                # We don't want to fail the whole upload if one file fails; log it.
+                print(f"Error extracting from {menu_file.filename}: {err}")
+                errors_encountered.append(f"{menu_file.filename}: {str(err)}")
+            finally:
+                if file_path.exists():
+                    try:
+                        os.remove(file_path)
+                    except Exception:
+                        pass
             
     if not all_extracted_items:
         err_msg = "; ".join(errors_encountered) if errors_encountered else "No menu items were extracted. Please ensure the file contains legible menu contents."

@@ -279,7 +279,8 @@ def extract_from_text_with_ollama(text: str, model: Optional[str] = None, api_ke
                 "parts": [{"text": prompt_text}]
             }],
             "generationConfig": {
-                "responseMimeType": "application/json"
+                "responseMimeType": "application/json",
+                "temperature": 0.0
             }
         }
         headers = {"Content-Type": "application/json"}
@@ -332,7 +333,8 @@ def extract_from_image_with_ollama(image_path: str | Path, model: Optional[str] 
                 ]
             }],
             "generationConfig": {
-                "responseMimeType": "application/json"
+                "responseMimeType": "application/json",
+                "temperature": 0.0
             }
         }
         headers = {"Content-Type": "application/json"}
@@ -381,7 +383,8 @@ def extract_from_text_with_gemini(text: str, api_key: Optional[str] = None) -> M
         }],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "responseSchema": gemini_schema
+            "responseSchema": gemini_schema,
+            "temperature": 0.0
         }
     }
     
@@ -426,7 +429,8 @@ def extract_from_images_with_gemini(image_paths: List[str | Path], api_key: Opti
         }],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "responseSchema": gemini_schema
+            "responseSchema": gemini_schema,
+            "temperature": 0.0
         }
     }
     
