@@ -24,56 +24,38 @@ REQUEST_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT", "300"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 SYSTEM_PROMPT = """
-You are a strict, high-fidelity restaurant menu extraction engine for ShopVerse POS bulk upload.
-Return ONLY valid JSON that matches the requested structure.
-Do not add markdown, explanations, or comments.
-Never invent, guess, autocomplete, or hallucinate menu items or prices. Use ONLY visible data present in the input file.
-If a value is not visible, use an empty string or null.
+You are a strict, high-fidelity restaurant menu extraction engine for Menu Ninja POS bulk upload.
+Return ONLY valid JSON matching the requested structure.
+No explanations, markdown, or comments.
+Never invent or hallucinate menu items or prices. Use ONLY visible input data.
 """.strip()
 
 MENU_EXTRACTION_PROMPT = """
-Extract restaurant/cafe menu data from the input with 100% precision.
-
-Structure:
+Extract restaurant menu items into JSON structure:
 {
   "currency": "INR",
   "document_notes": [],
   "items": [
     {
       "category": "category name",
-      "product_name": "item name",
+      "product_name": "clean item name",
       "description": "short description",
-      "dietary_tag": "Veg" or "Non-Veg" or "Egg" or "",
+      "dietary_tag": "veg" or "non veg" or "egg" or "",
       "confidence": 0.9,
       "source_text": "raw snippet",
-      "variations": [
-        {"name": "Regular", "price": 99.0, "listing_price": 120.0}
-      ]
+      "variations": [{"name": "Regular", "price": 99.0, "listing_price": 120.0}]
     }
   ]
 }
 
-Rules:
-1. Extract every visible menu item (food, drink, add-on option) with its category and price.
-2. Category should come from nearby heading/section. If not found, use "Uncategorized".
-3. Product name must be clean and must not include price, currency symbols, dots, or category name.
-4. Prices must be numeric only. Remove ₹, Rs, /-, commas, and text.
-5. If one item has variations/sizes/options with different prices, keep ONE item and put all variations inside variations[]:
-   Example: Small 99, Medium 149, Large 199 => variations = [Small 99, Medium 149, Large 199]
-6. If item has one price only, variations should contain one object with name="" and price=<price>.
-7. Infer and identify the dietary_tag ("veg", "non veg", "egg") based on the product name and product description, even if it is not explicitly written (egg roll is "egg", chicken tikka is "non veg", paneer is "veg", etc.). Convert all values to lowercase in output.
-8. Descriptions should be short and only if visible.
-9. Keep spelling exactly as written on the menu. Under no circumstances attempt to autocomplete abbreviations or guess misspelt/cut-off characters.
-10. Set confidence between 0 and 1 based on clarity of item name + price.
-11. Include a short source_text snippet for review.
-12. DO NOT extract the restaurant name, address, email, websites, phone/mobile numbers, GST/tax info, license info, opening hours, or social media handles as menu items. Focus strictly on food and beverage items.
-13. Keep decimals exactly as written (e.g., 9.9 or 14.99). Never round prices to whole numbers.
-14. Ensure side-by-side columns are aligned correctly. Do not misalign or swap lines when matching prices horizontally.
-15. Extract the currency precisely (e.g. if ₹/Rs is used set "currency": "INR", if $ set "currency": "USD").
-16. STRICT FIDELITY RULE: Never extrapolate or suggest menu items that are not directly present in the input text or image. Every extracted product name and price must exist in the input. If there are no items, return an empty items list.
-17. NEVER use historical corrections guidelines or learned memory to invent products that are missing from the current input. Only apply corrections as formatting/naming guidelines when a matching item is actually present.
-
-Return JSON only.
+Strict Rules:
+1. Extract ALL visible dishes and drinks. Never invent/extrapolate items.
+2. Group items with different sizes/prices as one item with multiple variations (e.g. Small 99, Large 149).
+3. If one price, set name="" and price. Do not round decimals.
+4. Clean product_name: remove prices and category headers. Keep exact spelling.
+5. Set dietary_tag to "veg", "non veg", "egg" or "" (infer logically: chicken is non-veg, paneer is veg, egg is egg).
+6. Category defaults to "Uncategorized" if no nearby heading.
+7. Ignore restaurant contact info, address, GST, licenses.
 """.strip()
 
 
@@ -89,14 +71,14 @@ def _get_prompt_with_memory() -> str:
     guidelines = []
     
     if prod_memory:
-        guidelines.append("--- Corrected Naming Guidelines (Learn and output cleanly like these examples when spelling matches) ---")
-        for orig, corr in list(prod_memory.items())[:15]:
-            guidelines.append(f'- Clean/Format "{orig}" -> output: "{corr}"')
+        guidelines.append("--- Corrected Naming Guidelines (Format matching items as below) ---")
+        for orig, corr in list(prod_memory.items())[:5]:
+            guidelines.append(f'- Formatting "{orig}" -> output: "{corr}"')
             
     if cat_memory:
-        guidelines.append("--- Corrected Category Guidelines (Learn classification preferences from these examples) ---")
-        for orig, corr in list(cat_memory.items())[:15]:
-            guidelines.append(f'- Classify item "{orig}" under category: "{corr}"')
+        guidelines.append("--- Corrected Category Guidelines (Classify matching items as below) ---")
+        for orig, corr in list(cat_memory.items())[:5]:
+            guidelines.append(f'- Classify "{orig}" under category: "{corr}"')
             
     if guidelines:
         return MENU_EXTRACTION_PROMPT + "\n\n" + "\n".join(guidelines)
@@ -270,32 +252,60 @@ def parse_loose_menu_extraction(parsed: Any) -> MenuExtraction:
 
 def _post_to_gemini(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout: int = 60) -> requests.Response:
     import time
-    max_retries = 3
-    retry_delay = 3.0  # seconds
+    import re
     
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=timeout)
-            if response.status_code == 429:
-                print(f"Gemini API rate limit (429) hit. Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
+    # List of models to try in sequence on quota/rate limit/error failures
+    model_rotation = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]
+    
+    # Extract API key from the url
+    key_match = re.search(r"key=([^&]+)", url)
+    api_key = key_match.group(1) if key_match else ""
+    
+    for current_model in model_rotation:
+        target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+        
+        max_retries = 2
+        retry_delay = 1.0  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Querying Gemini model '{current_model}' (Attempt {attempt+1}/{max_retries})...")
+                response = requests.post(target_url, json=payload, headers=headers, timeout=timeout)
+                
+                # If Gemini returned rate limiting or server error Status Code
+                if response.status_code in [400, 403, 404, 429, 500, 502, 503, 504]:
+                    print(f"Gemini model '{current_model}' HTTP status {response.status_code}. Trying next model...")
+                    break
+                    
+                response.raise_for_status()
+                
+                # Check for rate limiting or other api errors within successful payload
+                res_data = response.json()
+                if "error" in res_data:
+                    error_code = res_data["error"].get("code")
+                    print(f"Gemini API payload error: {res_data['error'].get('message')}. Trying next model...")
+                    break
+                    
+                # Success!
+                return response
+                
+            except requests.exceptions.RequestException as e:
+                # If it's an HTTP Status error, try next model
+                if hasattr(e, 'response') and e.response is not None:
+                    print(f"Gemini model '{current_model}' HTTP Error: {e}. Trying next model...")
+                    break
+                
+                # If it's a network socket/connection error or timeout, retry with current model
+                if attempt == max_retries - 1:
+                    print(f"Transient failures with model '{current_model}' after retries. Trying next model...")
+                    break
+                    
+                print(f"Transient error with '{current_model}': {e}. Retrying in {retry_delay}s...")
                 time.sleep(retry_delay)
                 retry_delay *= 1.5
-                continue
-            response.raise_for_status()
-            return response
-        except requests.exceptions.RequestException as e:
-            if attempt == max_retries - 1:
-                raise
-            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 429:
-                print(f"Gemini API rate-limited (429): retrying in {retry_delay}s...")
-                time.sleep(retry_delay)
-                retry_delay *= 1.5
-                continue
-            print(f"Transient error querying Gemini API: {e}. Retrying in {retry_delay}s...")
-            time.sleep(retry_delay)
-            retry_delay *= 1.5
-            
-    # Final fallback attempt
+                
+    # Final fallback attempt with the original URL
+    print(f"Attempting final query fallback with original url...")
     return requests.post(url, json=payload, headers=headers, timeout=timeout)
 
 
