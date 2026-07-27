@@ -1,7 +1,7 @@
 // Intercept all API fetch calls to use our live backend URL when hosted on Vercel
 (function () {
     const originalFetch = window.fetch;
-    const API_BASE = "https://croak-krypton-sculptor.ngrok-free.dev";
+    const API_BASE = "https://menuninjabynamank.onrender.com";
     window.fetch = function (url, options) {
         if (typeof url === 'string' && url.startsWith('/api')) {
             url = API_BASE + url;
