@@ -1,0 +1,593 @@
+--- Sheet: CF - Hawkers Street  ---
+FoodCategory | Street Eats
+Item | Spring Rolls | 0 | Crispy spring rolls filled with spring vegetables and proteins with sweet chili dipping sauce | SpringRolls.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 28
+Modifier | Chicken | 32
+Modifier | Shrimp | 36
+Item | Wontons | 0 | Cispy Fried or Steamed served with sweet chilli dipping sauce | Wontons.jpg
+Customization | Choose | radio | 1 | 1
+Modifier | Fried | 0
+Modifier | Steamed  🆕👍 | 0
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 26
+Modifier | Chicken | 29
+Modifier | Shrimp | 34
+Item | Cream Cheese Wontons | 39 | Crispy fried cheese wontons served with sweet chilli dipping sauce | CrispyPrawnsWithWasabiMayo.jpg
+Item | Thai Style Chicken Satay | 32 | Chicken skewers served with peanut sauce | Satay.jpg
+Item | Salt & Pepper  Tofu 👍 | 36 | Tossed in spicy garlic, ginger and sichuan pepper powder with sweet chilli dipping sauce | SaltPepper.jpg
+Item | Salt & Pepper  Calamari 👍 | 39 | Tossed in spicy garlic, ginger and sichuan pepper powder with sweet chilli dipping sauce | SaltPepper.jpg
+Item | Crispy Prawns With Wasabi Mayo 👍 | 48 | Crispy prawns and candied pineapples tossed in Wasabi Mayo | CrispyPrawnsWithWasabiMayo.jpg
+Item | Singaporean Style Fried Turnip Cake 👍 | 32 | Turnip cake stir-fried with bean sprouts, egg and sambal sauce | FriedTurnipCake.jpg
+Item | Prawn Crackers | 18 | Rice crackers with shrimp flavour | Satay.jpg
+FoodCategory | Hawker Wings
+Item | Salt & Pepper Wok Fried Chicken Wings 🆕 👍 | 39 | Chicken wings tossed in a spicy garlic, ginger and Sichuan pepper powder | WokFriedWings.jpg
+Item | Sticky Korean BBQ Wok Fried Chicken Wings 🆕 👍 | 42 | Chicken wings tossed in Korean style sticky sweet and savoury sauce
+Item | Firery Orange Wok Fried Chicken Wings 🆕 👍 | 42 | Chicken wings tossed in Citrusy orange sauce with a hint of chilli
+Item | Sweet & Sour Wok Fried Chicken Wings 🆕 👍 | 39 | Chicken wings tossed in a tangy sweet & sour glaze
+FoodCategory | Salads
+Item | The Chef's Salad 🆕 | 0 | Asian Salad, Thai herbs, soy vinaigrette served with choice of your Protein | TheChefsSalad.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu | 34
+Modifier | Chicken | 38
+Modifier | Shrimp | 42
+Item | Asian Grilled Chicken coconut salad  🆕👍 | 32 | Gilled Chicke, Water chestnuts, snow peas, broccoli, bell peppers, sweet chillu & coconut dressing | AsianGrilledChickencoconutsalad.jpg
+FoodCategory | Potstickers & Shu Mai
+Item | Potsickers - Chicken & Cheese | 38
+Item | Potsickers - Siracha Chicken | 38
+Item | Pot Stickers | 30 | Pan-fried Peking-style dumplings | PotStickers.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 5
+Modifier | Shrimp | 7
+Modifier | Beef | 9
+Item | Shu Mai  🆕 | 30 | Cantonese open-faced dumplings | ShuMai.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Chicken | 0
+Modifier | Shrimp | 5
+Item | Dim Sum Platter  🆕 👍 | 65 | A selection of 10 authentic Chinese Dim sum appetizers created by our chef and made by hand.This selection is ideal to share | DimSumPlatter.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Mix Veg./Chicken/Shrimp | 65
+Potstickers & Shu Mai | Bao Buns & Sandwiches
+Item | BBQ Chicken Bao Bun | 20
+Item | Thai Style Red Curry Bao Bun | 22
+Item | FireCracker Chicken Bao Bun | 22 | Pan-fried Peking-style dumplings | PotStickers.jpg
+Item | Mangloian Minced Beef Bao Bun | 22
+Item | Hoisin Duck Bao Bun | 22
+Item | Nutella and Peanut Butter Bao Bun | 22
+Item | Custard Bao | 20
+Customization | Choose Your Style | radio | 1 | 1
+Modifier | Steamed | 0
+Modifier | Fried 🆕👍 | 0
+Item | Dynamite Shrimp Bao Sandwich | 44
+Item | Crispy Peking Duck Bao Sandwich | 46
+Item | BBQ Chicken Duck Bao Sandwich | 40
+Item | Crispy Tofu Bao Sandwich | 38
+FoodCategory | Hawker's Specials
+Item | Bejing Crispy Duck | 70 | Fragrant Crispy Duck served with pancakes, hoisin sauce and julienne of cucumber and spring onion | BejingCrispyDuck.jpg
+Customization | Choose Portion | radio | 1 | 1
+Modifier | Quarter | 0
+Modifier | Half | 25
+Modifier | Full | 85
+Item | Crispy Honey Lemon Chicken | 39 | Crispy chicken with a honey and lemon sauce | CrispyHoneyLemonChicken.jpg
+Item | Dan Dan Noodles   🆕👍 🌶🌶🌶 | 36 | Firey spciy sichuan sauce on bed of thich noodles topped with crushed peanuts and preserved mushroomsstems.
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu | 3
+Modifier | Chicken | 6
+Modifier | Shrimp | 9
+Item | Katsu Curry 🆕 | 42 | Aromatic katsu curry sauce, chicken in crispy panko breadcrumbs, sticky white rice
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu Katsu | 4
+Modifier | Chicken Katsu | 6
+Modifier | Shrimp Katsu | 9
+Modifier | Yasai Katsu (Veg. ) | 7 | Sweet potato, aubergine and butternut squash coated in crispy panko breadcrumbs, covered in an aromatic curry sauce served with sticky rice and side salad
+FoodCategory | Soups  & Noodle Soups
+Item | Laksa Noodle Soup👍 | 35 | Malaysian-style coconut curry soup | LaksaNoodleSoup.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0 | 0 | 0
+Modifier | Chicken | 5
+Modifier | Shrimp | 9
+Item | Ramen Noodle Soup | 38 | Japanese Miso flovored soup with noodles and Asian vegetables | RamenNoodleSoup.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 4
+Modifier | Shrimp | 8
+Item | Hot and Sour | 30 | Shitake, tofu, bamboo shoots and egg in a spicy hot and sour broth | HotandSour.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 4
+Modifier | Shrimp | 6
+Item | Tom Yum 👍 | 30 | Spicy Thai-style broth with tomatoes, lemongrass, galangal and coriander | TomYum.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 4
+Modifier | Shrimp | 6
+Item | Wonton Soup | 30 | A clear broth with steamed wontons, waterchestnut and vehgetables | WontonSoup.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 4
+Modifier | Shrimp | 6
+Item | Sweet Corn | 27 | Creamy sweet corn soup with egg | SweetCorn.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 4
+Modifier | Shrimp | 6
+FoodCategory | Stir Fry & Curries
+Item | Black Bean | 34 | Fermented Black Bean Sauce with broccoli, capsicum, carrot, onion and shitake mushroom | BlackBean.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Sweet & Sour | 36 | Sweet and Sour tomato based sauce served with onion, capsicum and pineapple | SweetSour.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Kung Pao🌶👍 | 35 | Sichuan style spicy savory sauce with crunchy celery and peanuts | KungPao.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Crispy Chilli 🌶 | 35 | Sweet chilli sauce with capsicum, carrot, celery and spring onion | CrispyChilli.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Thai Curry Red or Green 🌶👍 | 36 | Thai coconut curry with ginger, Thai basil, capsicum, onions and green beans | ThaiRedorGreenCurry.jpg
+Customization | Choose | radio | 1 | 1
+Modifier | Red | 0
+Modifier | Green | 0
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Cantonese Style Spring Onion & Ginger | 36 | Savory ginger flavored sauce with snow peas, carrots and shitake mushrooms | CantoneseStyleSpringOnionGinger.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Black Pepper  🌶 | 35 | Freshly grounded black pepper sauce with capsicum and onion | BlackPepper.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Sichuan Sauce 🌶 | 35 | Sichuan Style spicy sauce with sichuan peppercorns, dry red chili, capsicum and spring onion | SichuanSauce.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Malaysaian Curry 🌶👍 | 36 | Fragrant Coconut flavored Malaysian style curry served with Potato | MalaysaianCurry.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Teriyaki | 36 | Japanese style Sweet and Savory Soya based sauce served with carrots and snowpeas | Teriyaki.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Egg) | 34
+Modifier | Fried Rice (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Ma Po Tofu  🆕🌱 | 35 | An sichuan classic receipe | MaPoTofu.jpg
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Veg) | 34
+Modifier | Fried Rice (Chicken) | 34
+Modifier | Stir Fry Soft Noodles (veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Stir Fry Broccoli   🆕🌱👍 | 35 | An sichuan classic receipe | StirFryBroccoli.jpg
+Customization | Choose | radio | 1 | 1
+Modifier | Oyster sauce | 0
+Modifier | Garlic & Ginger Sauce | 0
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Veg) | 34
+Modifier | Fried Rice (Chicken) | 34
+Modifier | Stir Fry Soft Noodles (veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Orange Chicken 🆕 | 42 | Crispy Chicken cooked in citrusy orange sauce
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Veg) | 34
+Modifier | Fried Rice (Chicken) | 34
+Modifier | Stir Fry Soft Noodles (veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+Item | Massaman Curry | 36 | Thai Style curry with Potato, peanuts, onion  creamy coconut. | Teriyaki.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Customization | Add on | radio | 1 | 1
+Modifier | Fried Rice (Veg) | 34
+Modifier | Fried Rice (Chicken) | 34
+Modifier | Stir Fry Soft Noodles (veg) | 34
+Modifier | Stir Fry Soft Noodles (Chicken) | 36
+FoodCategory | Rice
+Item | Fried Rice | 34 | Classic cantonese fired rice with scrambled egg and scallions | FriedRice.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Egg | 0 | 0 | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Vegetable Fried Rice 🌱👍 | 34 | Classic cantonese fired rice with onions, carrot, capsicum and pickled olive leaves | VegetableFriedRice.jpg
+Item | Nasi Goreng 👍 | 42 | Indonesian-style fried rice with vegetables and topped with fried egg | NasiGoreng.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Chicken | 0
+Modifier | Beef | 6
+Modifier | Shrimp | 9
+Item | Kimchi Fried Rice 🆕👍 | 39 | Korean style kimchi fried rice | KimchiFriedRice.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Tom Yum Fried Rice  🆕👍 | 38 | A fragrant combination of kaffir lime leaves, spring onions, onions and red shallots sweet,  salty, sour and spicy rice. spring onions, onions and red shallots sweet,  salty, sour and spicy rice
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Laksa Fried Rice  🆕👍 | 40 | Singaporean hawker Style Laksa flavored fried  rice topped with Crispy onions and egg. spring onions, onions and red shallots sweet,  salty, sour and spicy rice
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Thai Style Hot Basil with Rice 🆕🌶🌶 | 39 | Minced and stir fried chicken in thai hot basil served on steam rice and topped with fried egg | ThaiStyleChickenHotBasil.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu | 0
+Modifier | Chicken | 6
+Item | Steam Rice 🌱 | 20 | Jasmine Rice | SteamRice.jpg
+FoodCategory | Noodles
+Item | Stir fried soft noodles | 34 | Classic Stir Fried noodles along with vegetables | Stirfriedsoftnoodles.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Pad Thai - Thai Style Noodles | 34 | Thick Rice Noodles tossed in a spicy tamarind sauce along with bean sprouts and topped with crushed peanuts | PadThai.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 4
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+` | Singapore Style Vermicelli Noodles | 36 | Rice Vermicelli tossed with vegetables and spicy curry flavored sauce | SingaporeStyleVermicelliNoodles.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Asian Wok Black Pepper Udon Noodles👍 | 40 | Stir fry udon noodles with vegetables and black pepper sauce | AsianWokBlackPepperUdonNoodles.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Kimchi Udon Noodles 🆕👍 | 36 | Comfort noodles loaded with kimchi,  gochujang (Korean chilli paste), topped with  sesame seeds.
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Tofu | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+Item | Thai Style Hot Basil with Udon noodles 🆕🌶🌶 | 38 | Minced and stir fried chicken in thai hot basil wok tossed with udon noodles and topped with fried egg
+Customization | Choose Protein | radio
+Modifier | Tofu | 6
+Modifier | Chicken | 8
+Item | Cantonese Style Crispy Noodles | 38 | Vegetables with ginger flavored sauce served on a bed of Crispy Panfried Noodles | CantoneseStyleCrispyNoodles.jpg
+Customization | Choose Protein | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 6
+Modifier | Beef | 8
+Modifier | Shrimp | 10
+FoodCategory | Sweet Cravings
+Item | Brownie Macadamia | 14.9
+Item | Coco Choco Slab👍 | 11.9
+Chocolate Crunch Slab | 16.9
+FoodCategory | Hawker's Wok Box
+Item | Hawker's Wok Box | 48 | Choose your rice or noodles topped with your favorite stir-fry in a convenient, street-style food pail.
+Customization | Choose: Protein | radio | 1 | 1
+Modifier | Veg. | 0 | 0
+Modifier | Tofu🆕 | 6
+Modifier | Chicken | 8
+Modifier | Beef | 10
+Modifier | Shrimp | 12
+Customization | Choose: Stir Fry Sauce | radio | 1 | 1
+Modifier | Cantonese Style Spring Onion & Ginger | 0
+Modifier | Sweet & Sour | 0
+Modifier | Kung Pao🌶 | 0
+Modifier | Sichuan Sauce 🌶 | 0
+Modifier | Black Pepper  🌶 | 0
+Modifier | Teriyaki | 0
+Modifier | Oyster sauce | 0
+Customization | Choose: Base | radio | 1 | 1
+Modifier | Steam Rice 🌱 | 0
+Modifier | Stir fry soft noodle (Veg.) | 0
+Modifier | Fried Rice(Egg) | 2
+Modifier | Udon Noodles | 4
+Customization | Choose | radio | 2 | 2
+Modifier | Prawn Crackers | 0
+Customization | Top Up | radio | 1 | 1
+Modifier | Pepsi | 4
+Modifier | Diet Pepsi | 4
+Modifier | Miranda | 4
+Modifier | 7 Up | 4
+Modifier | Mountain Dew | 4
+Modifier | Aquafina | 4
+Customization | Top Up | checkbox | 0 | 10
+Modifier | Hot and Sour (veg) Small | 8
+Modifier | Sweet Corn Soup (veg) Small | 8
+Modifier | Spring Rolls (veg.) 1 Pc. | 4
+Modifier | Spring Rolls (Ckn.) 1 Pc. | 5
+FoodCategory | Drinks
+Item | Coke | 6
+Item | Coke Zero | 6
+Item | Sprite | 6
+Item | Fanta | 6
+Item | Water (500ml) | 6
+Item | Singapore Style Iced Milo | 18 | A cool, blast of chocolate malt goodness. This iced version of the iconic Milo drink is rich and refreshingly addictive just like the ones from Southeast Asian street stalls.
+Item | Singapore Milo Dino Power | 22 | This amped up version of the classic singapore iced milo is topped with a mountain of undissolved milo powder for that malty crunch and extra chocolate hit big, bold, and built to slay your sweet cravings
+Item | Bangkok Style Iced Tea Cha Yen | 18 | Bold, creamy and ice cold. This traditional Thai tea is brewed with strong black tea, sweetened with condensed milk and finished with a smooth evaporated milk pour. A street style, just like in Bangkok.
+Item | Bangkok Style - Iced Green Tea (Cha Kiao Yen) | 18 | Smooth, earthy, and refreshingly sweet, this vibrant Thai green tea is brewed strong and blended with creamy condensed milk, then served over ice. A perfect cool down with a matcha like kick.
+Item | Bangkok Iced Coffee Gafae Yen | 20 | Strong, sweet and creamy, this bold Thai style iced coffee is prepared dark in color, sweetened with condensed milk and poured over ice for a rich, refreshing caffeine boost
+FoodCategory | Party Meals
+Item | Meal for 3-4 | 199 | Mealfor3-4.jpg
+Customization | Choose Soup1 | radio | 1 | 1
+Modifier | Hot & Sour (Veg) | 0
+Modifier | Hot & Sour (Chicken) | 0
+Modifier | Sweet Corn (Veg) | 0
+Modifier | Sweet Corn (Chicken) | 0
+Customization | Choose Soup2 | radio | 1 | 1
+Modifier | Hot & Sour (Veg) | 0
+Modifier | Hot & Sour (Chicken) | 0
+Modifier | Sweet Corn (Veg) | 0
+Modifier | Sweet Corn (Chicken) | 0
+Customization | Choose Starter 1 | radio | 1 | 1
+Modifier | Spring Rolls (veg) | 0
+Modifier | Spring Rolls (Chicken) | 0
+Modifier | Pot Stickers (veg) | 0
+Modifier | Pot Stickers (Chicken) | 0
+Modifier | Wonton (veg) | 0
+Modifier | Wonton (Chicken) | 0
+Customization | Choose Starter 2 | radio | 1 | 1
+Modifier | Spring Rolls (veg) | 0
+Modifier | Spring Rolls (Chicken) | 0
+Modifier | Pot Stickers (veg) | 0
+Modifier | Pot Stickers (Chicken) | 0
+Modifier | Wonton (veg) | 0
+Modifier | Wonton (Chicken) | 0
+Customization | Choose Stir Fry 1 | radio | 1 | 1
+Modifier | Sweet & Sour | 0
+Modifier | Kung Pao🌶 | 0
+Modifier | Crispy Chilli 🌶 | 0
+Modifier | Thai Red or Green Curry 🌶 | 0
+Modifier | Malaysaian Curry 🌶 | 0
+Modifier | Sichuan Sauce 🌶 | 0
+Modifier | Black Pepper  🌶 | 0
+Modifier | Teriyaki | 0
+Modifier | Oyster sauce | 0
+Customization | Choose Protein1 | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 0
+Modifier | Beef | 0
+Modifier | Shrimp | 0
+Customization | Choose Stir Fry 2 | radio | 1 | 1
+Modifier | Sweet & Sour | 0
+Modifier | Kung Pao🌶 | 0
+Modifier | Crispy Chilli 🌶 | 0
+Modifier | Thai Red or Green Curry 🌶 | 0
+Modifier | Malaysaian Curry 🌶 | 0
+Modifier | Sichuan Sauce 🌶 | 0
+Modifier | Black Pepper  🌶 | 0
+Modifier | Teriyaki | 0
+Modifier | Oyster sauce | 0
+Customization | Choose Protein2 | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 0
+Modifier | Beef | 0
+Modifier | Shrimp | 0
+Customization | Choose Rice Or Noodle 1 | radio | 1 | 1
+Modifier | Steam Rice | 0
+Modifier | Fried Rice Egg | 0
+Modifier | Fried Rice (Chicken) | 0
+Modifier | Stir fried soft noodles (Veg) | 0
+Modifier | Stir Fried soft noodles (Chicken) | 0
+Customization | Choose Rice Or Noodle 2 | radio | 1 | 1
+Modifier | Steam Rice | 0
+Modifier | Fried Rice Egg | 0
+Modifier | Fried Rice (Chicken) | 0
+Modifier | Stir fried soft noodles (Veg) | 0
+Modifier | Stir Fried soft noodles (Chicken) | 0
+Item | Meal for 6-8 | 499 | Mealfor6-8.jpg
+Customization | Choose Soup1 | radio | 1 | 1
+Modifier | Hot & Sour (Veg) | 0
+Modifier | Hot & Sour (Chicken) | 0
+Modifier | Sweet Corn (Veg) | 0
+Modifier | Sweet Corn (Chicken) | 0
+Customization | Choose Soup2 | radio | 1 | 1
+Modifier | Hot & Sour (Veg) | 0
+Modifier | Hot & Sour (Chicken) | 0
+Modifier | Sweet Corn (Veg) | 0
+Modifier | Sweet Corn (Chicken) | 0
+Customization | Choose Soup3 | radio | 1 | 1
+Modifier | Hot & Sour (Veg) | 0
+Modifier | Hot & Sour (Chicken) | 0
+Modifier | Sweet Corn (Veg) | 0
+Modifier | Sweet Corn (Chicken) | 0
+Customization | Choose Soup4 | radio | 1 | 1
+Modifier | Hot & Sour (Veg) | 0
+Modifier | Hot & Sour (Chicken) | 0
+Modifier | Sweet Corn (Veg) | 0
+Modifier | Sweet Corn (Chicken) | 0
+Customization | Choose Starter 1 | radio | 1 | 1
+Modifier | Spring Rolls (veg) | 0
+Modifier | Spring Rolls (Chicken) | 0
+Modifier | Pot Stickers (veg) | 0
+Modifier | Pot Stickers (Chicken) | 0
+Modifier | Wonton (veg) | 0
+Modifier | Wonton (Chicken) | 0
+Customization | Choose Starter 2 | radio | 1 | 1
+Modifier | Spring Rolls (veg) | 0
+Modifier | Spring Rolls (Chicken) | 0
+Modifier | Pot Stickers (veg) | 0
+Modifier | Pot Stickers (Chicken) | 0
+Modifier | Wonton (veg) | 0
+Modifier | Wonton (Chicken) | 0
+Customization | Choose Starter 3 | radio | 1 | 1
+Modifier | Spring Rolls (veg) | 0
+Modifier | Spring Rolls (Chicken) | 0
+Modifier | Pot Stickers (veg) | 0
+Modifier | Pot Stickers (Chicken) | 0
+Modifier | Wonton (veg) | 0
+Modifier | Wonton (Chicken) | 0
+Customization | Choose Starter 4 | radio | 1 | 1
+Modifier | Spring Rolls (veg) | 0
+Modifier | Spring Rolls (Chicken) | 0
+Modifier | Pot Stickers (veg) | 0
+Modifier | Pot Stickers (Chicken) | 0
+Modifier | Wonton (veg) | 0
+Modifier | Wonton (Chicken) | 0
+Customization | Choose Stir Fry 1 | radio | 1 | 1
+Modifier | Sweet & Sour | 0
+Modifier | Kung Pao🌶 | 0
+Modifier | Crispy Chilli 🌶 | 0
+Modifier | Thai Red or Green Curry 🌶 | 0
+Modifier | Malaysaian Curry 🌶 | 0
+Modifier | Sichuan Sauce 🌶 | 0
+Modifier | Black Pepper  🌶 | 0
+Modifier | Teriyaki | 0
+Modifier | Oyster sauce | 0
+Customization | Choose Protein1 | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 0
+Modifier | Beef | 0
+Modifier | Shrimp | 0
+Customization | Choose Stir Fry 2 | radio | 1 | 1
+Modifier | Sweet & Sour | 0
+Modifier | Kung Pao🌶 | 0
+Modifier | Crispy Chilli 🌶 | 0
+Modifier | Thai Red or Green Curry 🌶 | 0
+Modifier | Malaysaian Curry 🌶 | 0
+Modifier | Sichuan Sauce 🌶 | 0
+Modifier | Black Pepper  🌶 | 0
+Modifier | Teriyaki | 0
+Modifier | Oyster sauce | 0
+Customization | Choose Protein2 | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 0
+Modifier | Beef | 0
+Modifier | Shrimp | 0
+Customization | Choose Stir Fry 3 | radio | 1 | 1
+Modifier | Sweet & Sour | 0
+Modifier | Kung Pao🌶 | 0
+Modifier | Crispy Chilli 🌶 | 0
+Modifier | Thai Red or Green Curry 🌶 | 0
+Modifier | Malaysaian Curry 🌶 | 0
+Modifier | Sichuan Sauce 🌶 | 0
+Modifier | Black Pepper  🌶 | 0
+Modifier | Teriyaki | 0
+Modifier | Oyster sauce | 0
+Customization | Choose Protein3 | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 0
+Modifier | Beef | 0
+Modifier | Shrimp | 0
+Customization | Choose Stir Fry 4 | radio | 1 | 1
+Modifier | Sweet & Sour | 0
+Modifier | Kung Pao🌶 | 0
+Modifier | Crispy Chilli 🌶 | 0
+Modifier | Thai Red or Green Curry 🌶 | 0
+Modifier | Malaysaian Curry 🌶 | 0
+Modifier | Sichuan Sauce 🌶 | 0
+Modifier | Black Pepper  🌶 | 0
+Modifier | Teriyaki | 0
+Modifier | Oyster sauce | 0
+Customization | Choose Protein4 | radio | 1 | 1
+Modifier | Veg. | 0
+Modifier | Chicken | 0
+Modifier | Beef | 0
+Modifier | Shrimp | 0
+Customization | Choose Rice Or Noodle 1 | radio | 1 | 1
+Modifier | Steam Rice | 0
+Modifier | Fried Rice Egg | 0
+Modifier | Fried Rice (Chicken) | 0
+Modifier | Stir fried soft noodles (Veg) | 0
+Modifier | Stir Fried soft noodles (Chicken) | 0
+Customization | Choose Rice Or Noodle 2 | radio | 1 | 1
+Modifier | Steam Rice | 0
+Modifier | Fried Rice Egg | 0
+Modifier | Fried Rice (Chicken) | 0
+Modifier | Stir fried soft noodles (Veg) | 0
+Modifier | Stir Fried soft noodles (Chicken) | 0
+Customization | Choose Rice Or Noodle 3 | radio | 1 | 1
+Modifier | Steam Rice | 0
+Modifier | Fried Rice Egg | 0
+Modifier | Fried Rice (Chicken) | 0
+Modifier | Stir fried soft noodles (Veg) | 0
+Modifier | Stir Fried soft noodles (Chicken) | 0
+Customization | Choose Rice Or Noodle 4 | radio | 1 | 1
+Modifier | Steam Rice | 0
+Modifier | Fried Rice Egg | 0
+Modifier | Fried Rice (Chicken) | 0
+Modifier | Stir fried soft noodles (Veg) | 0
+Modifier | Stir Fried soft noodles (Chicken) | 0

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: quick-menu-agent
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OLLAMA_BASE_URL
+        value: "http://127.0.0.1:11434"
+      - key: OLLAMA_TEXT_MODEL
+        value: "llama3.1:latest"
+      - key: OLLAMA_VISION_MODEL
+        value: "llava:latest"
+      - key: OLLAMA_TIMEOUT
+        value: "240"

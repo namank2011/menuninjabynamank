@@ -1,0 +1,40 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment secrets
+.env
+.env.dev
+.env.prod
+
+# Pycache and python builds
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Local databases
+*.db
+*.sqlite
+
+# Local uploaded/output files and folders
+uploads/*
+!uploads/.gitkeep
+outputs/*
+!outputs/.gitkeep
+drafts/*
+!drafts/.gitkeep
+audit_logs/*
+!audit_logs/.gitkeep
+
+# Compiled binaries
+ngrok.exe
+ngrok
+
+# IDE files
+.vscode/
+.idea/
+.DS_Store

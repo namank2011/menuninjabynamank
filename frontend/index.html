@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Ninja | by Naman Kshetri</title>
+    <!-- Premium Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="static/style.css?v=1.1.2">
+</head>
+
+<body class="light-mode">
+    <div class="app-container">
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <i class="fa-solid fa-user-ninja logo-icon"></i>
+                <div class="logo-text">
+                    <h2>Menu Ninja</h2>
+                    <span>by Naman Kshetri</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" id="btn-dash" onclick="switchView('dashboard')">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </button>
+                <button class="nav-btn" id="btn-create" onclick="switchView('create')">
+                    <i class="fa-solid fa-plus"></i> New Extraction
+                </button>
+                <div class="nav-section-title">Review Steps</div>
+                <div class="stages-links">
+                    <button class="step-nav-btn" data-step="1" disabled onclick="goToStep(1)">
+                        <span class="step-circle">1</span> Verify & Clean
+                    </button>
+                    <button class="step-nav-btn" data-step="2" disabled onclick="goToStep(2)">
+                        <span class="step-circle">2</span> Visual Preview
+                    </button>
+                    <button class="step-nav-btn" data-step="3" disabled onclick="goToStep(3)">
+                        <span class="step-circle">3</span> Approve & Export
+                    </button>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="nav-btn" id="btn-settings" onclick="toggleSettingsModal()"
+                    style="width: 100%; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-radius: 8px; font-family: inherit; font-size: 14px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
+                    <i class="fa-solid fa-gear"></i> Settings / API Key
+                </button>
+                <div class="ollama-status">
+                    <span class="status-dot online"></span>
+                    <span class="status-lbl">Ollama: llama3.1:latest</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+
+            <header class="workspace-header">
+                <div class="header-left">
+                    <h1 id="workspace-title">Dashboard</h1>
+                    <p id="workspace-subtitle" class="subtitle">Manage and review your digitized menus</p>
+                </div>
+                <div class="header-right">
+                    <button class="secondary-btn" id="save-draft-btn" onclick="saveDraftProgress()"
+                        style="display: none;">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Draft
+                    </button>
+                    <button class="secondary-btn" id="audit-log-toggle" onclick="toggleAuditLogsModal()"
+                        style="display: none;">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Audit Logs
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <section id="view-dashboard" class="content-view active">
+                <div class="dashboard-grid">
+                    <div class="dash-welcome-card glassmorphic">
+                        <div class="welcome-text">
+                            <h3>Digitize Restaurant Menus with 100% Accuracy</h3>
+                            <p>Upload files (Images, PDFs, Word, Excel). The ShopVerse Agent uses local LLMs to parse
+                                categories, variations, and prices. Complete the 6-stage review to export approved
+                                ShopVerse Upload sheets.</p>
+                        </div>
+                        <button class="primary-btn animate-pulse" onclick="switchView('create')">
+                            <i class="fa-solid fa-file-arrow-up"></i> Start New Extraction
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-container">
+                    <div class="section-header">
+                        <h2>Existing Menu Drafts</h2>
+                    </div>
+                    <div class="drafts-table-container glassmorphic">
+                        <table class="grid-table">
+                            <thead>
+                                <tr>
+                                    <th>Business Name</th>
+                                    <th>Created At</th>
+                                    <th>Last Modified</th>
+                                    <th>Status</th>
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drafts-list-body">
+                                <tr>
+                                    <td colspan="5" class="empty-state">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading drafts...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Create / Upload View -->
+            <section id="view-create" class="content-view">
+                <div class="create-layout">
+                    <div class="upload-section glassmorphic">
+                        <h3>1. Upload Source Files</h3>
+                        <p class="section-desc">Drag & drop menu files. Uploading multiple pages is supported.</p>
+
+                        <div class="drop-zone" id="file-drop-zone">
+                            <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                            <p>Drag and drop menus (images, PDFs, DOCX, XLSX, TXT) or <strong>Browse</strong></p>
+                            <input type="file" id="menu-file-input" multiple style="display: none;">
+                        </div>
+
+                        <!-- Drop template zone -->
+                        <div class="custom-template-area">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="chk-use-default-template" checked
+                                    onchange="toggleTemplateUpload(this)">
+                                <span class="checkmark"></span>
+                                Use Default ShopVerse Template
+                            </label>
+                            <div id="template-upload-zone" class="template-upload-box" style="display: none;">
+                                <p>Upload custom `Bulk_Upload_Sheet_Format.xlsx` template:</p>
+                                <input type="file" id="template-file-input" accept=".xlsx">
+                            </div>
+                        </div>
+
+                        <div class="uploaded-files-list" id="uploaded-files-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="defaults-section glassmorphic">
+                        <h3>2. Business & Tax Defaults</h3>
+                        <p class="section-desc">Assign baseline parameters that will be applied to missing menu values.
+                        </p>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="form-business-name">Business Name*</label>
+                                <input type="text" id="form-business-name" placeholder="e.g. Naman's Bistro"
+                                    requiredValue>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-tax-category">Tax Category*</label>
+                                <select id="form-tax-category">
+                                    <option value="Services" selected>Services</option>
+                                    <option value="Goods">Goods</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-tax-type">Tax Type*</label>
+                                <select id="form-tax-type">
+                                    <option value="GST" selected>GST</option>
+                                    <option value="VAT">VAT</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-tax-value">Tax Percentage*</label>
+                                <div class="input-addon-group">
+                                    <input type="number" id="form-tax-value" value="5" min="0" max="100">
+                                    <span class="addon">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-master-status">Master Status*</label>
+                                <select id="form-master-status">
+                                    <option value="Active" selected>Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-station">Default kitchen station</label>
+                                <input type="text" id="form-station" value="Kitchen">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-prep-time">Default prep time</label>
+                                <input type="text" id="form-prep-time" placeholder="e.g. 15 mins">
+                            </div>
+                            <div class="form-group">
+                                <label for="form-dietary">Default dietary tag</label>
+                                <select id="form-dietary">
+                                    <option value="" selected>None / Infer from item</option>
+                                    <option value="veg">Veg</option>
+                                    <option value="non veg">Non-Veg</option>
+                                    <option value="egg">Egg</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-extraction-engine">Extraction Engine</label>
+                                <select id="form-extraction-engine"
+                                    style="border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--card-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s;">
+                                    <option value="gemini" selected>Google Gemini Cloud (Recommended)</option>
+                                    <option value="ollama">Ollama Local (llama3.1:latest)</option>
+                                    <option value="heuristics">Heuristics (Offline OCR Bypass)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="action-footer" style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px;">
+                            <button class="primary-btn large-btn" id="start-extraction-btn"
+                                onclick="triggerExtraction(false)" disabled>
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Extract & Start Review Flow
+                            </button>
+                            <button class="success-btn large-btn" id="quick-export-btn"
+                                onclick="triggerExtraction(true)" disabled>
+                                <i class="fa-solid fa-file-arrow-down"></i> Quick One-Click Bulk Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Review Wizard Container -->
+            <section id="view-review-flow" class="content-view">
+
+                <!-- Stepper Progress Bar -->
+                <div class="stepper-progress glassmorphic">
+                    <div class="stepper-line" id="stepper-progress-line"></div>
+                    <div class="step-indicator current" data-step="1" onclick="goToStep(1)" style="cursor: pointer;">
+                        <div class="step-dot"><i class="fa-solid fa-list-check"></i></div>
+                        <div class="step-label">Step 1: Verify & Clean</div>
+                    </div>
+                    <div class="step-indicator" data-step="2" onclick="goToStep(2)" style="cursor: pointer;">
+                        <div class="step-dot"><i class="fa-solid fa-book-open"></i></div>
+                        <div class="step-label">Step 2: Live Preview</div>
+                    </div>
+                    <div class="step-indicator" data-step="3" onclick="goToStep(3)" style="cursor: pointer;">
+                        <div class="step-dot"><i class="fa-solid fa-file-shield"></i></div>
+                        <div class="step-label">Step 3: Approve & Export</div>
+                    </div>
+                </div>
+
+                <!-- Review stages panels -->
+                <div class="review-panel-wrapper">
+
+                    <!-- LEFT SIDE: Review Table / Cards -->
+                    <div class="review-main-column" id="review-main-column">
+
+                        <!-- STAGE 1: Extraction Review Grid Table -->
+                        <div id="stage-panel-1" class="stage-contents active">
+                            <!-- Process telemetry banner -->
+                            <div id="extraction-telemetry-banner" class="glassmorphic"
+                                style="display: none; padding: 12px 16px; margin-bottom: 16px; border-left: 4px solid var(--primary); font-size: 13px; color: var(--text-main); align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-clock-rotate-left"
+                                    style="color: var(--primary); font-size: 16px;"></i>
+                                <span id="telemetry-text">Processed via Gemini in 4.5s</span>
+                            </div>
+
+                            <div class="toolbar glassmorphic">
+                                <div class="toolbar-left">
+                                    <div class="search-box">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                        <input type="text" id="stage1-search" placeholder="Search item..."
+                                            oninput="renderTableStage1()">
+                                    </div>
+                                    <select id="stage1-filter-cat" onchange="renderTableStage1()"></select>
+                                    <select id="stage1-filter-conf" onchange="renderTableStage1()">
+                                        <option value="all">All Confidence</option>
+                                        <option value="low">Low Confidence (<75%)< /option>
+                                        <option value="high">High Confidence (>=75%)</option>
+                                    </select>
+                                </div>
+                                <div class="toolbar-right">
+                                    <button class="secondary-btn btn-sm" onclick="addNewItemRow()"><i
+                                            class="fa-solid fa-plus"></i> Add Row</button>
+                                    <button class="secondary-btn btn-sm" onclick="bulkApproveItems()"><i
+                                            class="fa-solid fa-check-double"></i> Bulk Approve</button>
+                                </div>
+                            </div>
+
+                            <div class="table-scroll-container glassmorphic">
+                                <table class="review-grid-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>Category Name*</th>
+                                            <th>Product Name*</th>
+                                            <th>Variant Group</th>
+                                            <th>Variation (Split by #)</th>
+                                            <th>Selling Price* (Split by #)</th>
+                                            <th>Listing Price (Split by #)</th>
+                                            <th>Description</th>
+                                            <th>Dietary Tag</th>
+                                            <th class="narrow-col">Con.</th>
+                                            <th class="narrow-col">Valid</th>
+                                            <th class="actions-col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stage1-table-body">
+                                        <!-- Rendered dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Dynamic Category Clean & Merge Section inside Step 1 -->
+                            <div class="categories-review-grid" style="margin-top: 24px;">
+                                <div class="categories-list-box glassmorphic" style="padding: 20px;">
+                                    <h3 style="font-size: 16px; margin-bottom: 6px;"><i class="fa-solid fa-list"></i>
+                                        Detected Categories</h3>
+                                    <p class="section-desc" style="margin-bottom: 12px; font-size: 12px;">Renaming a
+                                        category will update all underlying products in bulk.</p>
+                                    <div class="categories-cards-list" id="category-cards-list"
+                                        style="max-height: 250px; overflow-y: auto;">
+                                        <!-- Dynamically generated list -->
+                                    </div>
+                                </div>
+
+                                <div class="category-merge-box glassmorphic" style="padding: 20px;">
+                                    <h3 style="font-size: 16px; margin-bottom: 6px;"><i
+                                            class="fa-solid fa-code-merge"></i> Clean / Merge Categories</h3>
+                                    <p class="section-desc" style="margin-bottom: 12px; font-size: 12px;">Select a
+                                        category and merge it into another to solve duplicates.</p>
+
+                                    <div class="merge-form"
+                                        style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
+                                        <div class="form-group"
+                                            style="display: flex; flex-direction: column; gap: 4px;">
+                                            <label for="merge-source" style="font-size: 12px; font-weight: 500;">Source
+                                                Category (To remove)</label>
+                                            <select id="merge-source"
+                                                style="padding: 8px 10px; font-size: 13px;"></select>
+                                        </div>
+                                        <div class="form-group"
+                                            style="display: flex; flex-direction: column; gap: 4px;">
+                                            <label for="merge-target" style="font-size: 12px; font-weight: 500;">Target
+                                                Category (To keep)</label>
+                                            <select id="merge-target"
+                                                style="padding: 8px 10px; font-size: 13px;"></select>
+                                        </div>
+                                        <button class="primary-btn btn-sm" onclick="executeCategoryMerge()"
+                                            style="margin-top: 8px;">
+                                            Merge Categories
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- STAGE 5: Final Menu Preview -->
+                        <div id="stage-panel-5" class="stage-contents">
+                            <div class="menu-preview-layout glassmorphic">
+                                <div class="menu-preview-header">
+                                    <h2 id="preview-menu-business">Restaurant Menu</h2>
+                                    <span>Digitized via ShopVerse POS Agent</span>
+                                </div>
+                                <div class="menu-preview-body" id="menu-preview-container">
+                                    <!-- Structured food menu layout -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- STAGE 6: Final Approval checkbox and Exporter -->
+                        <div id="stage-panel-6" class="stage-contents">
+                            <div class="approval-layout">
+                                <div class="validation-summary-card glassmorphic">
+                                    <h3>Automated Validation Check</h3>
+                                    <ul class="validation-checklist" id="final-validation-checklist">
+                                        <!-- Populate checklist -->
+                                    </ul>
+                                </div>
+
+                                <div class="approval-agreement-card glassmorphic">
+                                    <h3>Final Approval Signature</h3>
+                                    <p>You are authorizing the creation of the official ShopVerse Excel Upload workbook.
+                                        Please double check that you have verified all prices and variations.</p>
+
+                                    <label class="checkbox-container lg-checkbox">
+                                        <input type="checkbox" id="chk-final-approval"
+                                            onchange="toggleFinalExportButton()">
+                                        <span class="checkmark"></span>
+                                        <strong>I have reviewed the categories, item names, prices, variations and
+                                            mandatory fields, and I approve this menu for ShopVerse bulk
+                                            upload.</strong>
+                                    </label>
+
+                                    <div class="export-actions">
+                                        <button class="primary-btn xl-btn" id="final-export-xlsx-btn" disabled
+                                            onclick="approveAndDownloadExcel()">
+                                            <i class="fa-solid fa-file-excel"></i> Generate & Download ShopVerse Excel
+                                            File
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="success-export-card glassmorphic" id="success-export-card"
+                                    style="display: none;">
+                                    <div class="success-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+                                    <h3>Bulk Upload Files Generated Successfully!</h3>
+                                    <p>Your shopverse excel sheets and validation review summaries are ready for
+                                        integration.</p>
+                                    <div class="download-links-area">
+                                        <a href="" id="link-excel-download" class="download-btn xlsx" download><i
+                                                class="fa-solid fa-file-excel"></i> Download `.xlsx` Upload Sheet</a>
+                                        <a href="" id="link-report-download" class="download-btn txt" download><i
+                                                class="fa-solid fa-file-lines"></i> Download Audit Report (`.txt`)</a>
+                                        <a href="" id="link-json-download" class="download-btn json" download><i
+                                                class="fa-solid fa-file-code"></i> Download Audit Report (`.json`)</a>
+                                    </div>
+                                    <button class="secondary-btn" onclick="switchView('dashboard')">Return to
+                                        Dashboard</button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT SIDE: Side-by-Side Source Snippet Viewer -->
+                    <div class="review-sidebar-column glassmorphic" id="review-sidebar-column">
+                        <div class="sidebar-sticky">
+                            <h3>Source Comparison Viewer</h3>
+                            <p class="section-desc">Compare the selected product properties directly against raw OCR
+                                extraction blocks.</p>
+
+                            <div class="source-viewer-card" id="source-viewer-empty">
+                                <i class="fa-solid fa-eye-slash placeholder-eye"></i>
+                                <p>Select an item from the review panel to compare its source details here.</p>
+                            </div>
+
+                            <div class="source-viewer-card" id="source-viewer-active" style="display: none;">
+                                <div class="source-field-group">
+                                    <label>Product Name</label>
+                                    <h4 id="source-view-name">Cold Coffee</h4>
+                                </div>
+                                <div class="source-field-group">
+                                    <label>Associated File</label>
+                                    <span class="badge" id="source-view-file">menu.pdf</span>
+                                    <span class="badge" id="source-view-confidence">Confidence: 94%</span>
+                                </div>
+                                <hr>
+                                <div class="source-field-group" id="source-view-errors-group" style="display: none;">
+                                    <label style="color:#e74c3c; font-weight: 600;"><i
+                                            class="fa-solid fa-triangle-exclamation"></i> Validation Alerts &
+                                        Reasons</label>
+                                    <div class="validation-errors-panel" id="source-view-errors-list"
+                                        style="background: rgba(231, 76, 60, 0.08); border: 1px solid rgba(231, 76, 60, 0.2); border-radius: 6px; padding: 12px; margin-top: 6px; max-height: 180px; overflow-y: auto;">
+                                        <!-- Error details list -->
+                                    </div>
+                                </div>
+                                <div class="source-field-group" id="source-view-no-errors-group" style="display: none;">
+                                    <div
+                                        style="background: rgba(46, 204, 113, 0.08); border: 1px solid rgba(46, 204, 113, 0.2); border-radius: 6px; padding: 12px; color: #27ae60; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                                        <i class="fa-solid fa-circle-check"></i> Complies with all upload instructions.
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="source-field-group">
+                                    <label>Raw Extracted Segment Snippet</label>
+                                    <div class="raw-text-view" id="source-view-raw-text">
+                                        Cold Coffee Regular 120 Large 160
+                                    </div>
+                                </div>
+                                <div class="source-field-group">
+                                    <label>Generate AI Description</label>
+                                    <button class="secondary-btn btn-sm" onclick="generateSingleDescription()"><i
+                                            class="fa-solid fa-robot"></i> Generate description</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer controllers -->
+                <div class="review-flow-footer glassmorphic">
+                    <button class="secondary-btn" id="wizard-prev-btn" onclick="prevStep()"><i
+                            class="fa-solid fa-arrow-left"></i> Previous Step</button>
+                    <div class="status-summary" id="wizard-summary-status">
+                        Pending Validation: <strong class="warning-text">0 items</strong>
+                    </div>
+                    <button class="primary-btn" id="wizard-next-btn" onclick="nextStep()">Next Step <i
+                            class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Audits Modal -->
+    <div class="modal" id="audit-logs-modal">
+        <div class="modal-content glassmorphic">
+            <div class="modal-header">
+                <h3>Draft Modification Audit Trail</h3>
+                <button class="close-btn" onclick="toggleAuditLogsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>Modification Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-logs-table-body">
+                        <!-- Populate dynamic audit logs -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal"
+        style="display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 1100;">
+        <div class="modal-content glassmorphic"
+            style="max-width: 450px; width: 90%; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px var(--shadow-color);">
+            <div class="modal-header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Settings & API Config</h3>
+                <button class="close-btn" onclick="toggleSettingsModal()"
+                    style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px;">
+                    <label for="settings-gemini-key" style="font-weight: 500; font-size: 14px;">Google Gemini API
+                        Key</label>
+                    <input type="password" id="settings-gemini-key" placeholder="Enter your Gemini API key (AIzaSy...)"
+                        style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--body-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; box-sizing: border-box;">
+                    <span style="font-size: 12px; color: var(--text-muted); display: block; line-height: 1.4;">This key
+                        is stored locally in your browser and used for extraction on any device.</span>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button class="secondary-btn" onclick="toggleSettingsModal()">Cancel</button>
+                <button class="primary-btn" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/app.js?v=1.1.0"></script>
+</body>
+
+</html>
