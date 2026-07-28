@@ -1,22 +1,22 @@
 :root {
-    --bg-primary: #f8fafc;
-    --bg-secondary: #0f172a;
-    --bg-glass: rgba(255, 255, 255, 0.85);
-    --border-glass: rgba(124, 58, 237, 0.12);
-    --text-primary: #0f172a;
-    --text-secondary: #334155;
-    --text-muted: #64748b;
+    --bg-primary: #f5f8f3;
+    --bg-secondary: #131c0e;
+    --bg-glass: rgba(255, 255, 255, 0.88);
+    --border-glass: rgba(98, 130, 71, 0.14);
+    --text-primary: #1c2616;
+    --text-secondary: #3b4734;
+    --text-muted: #66755e;
 
-    --primary: #7c3aed;
-    --primary-glow: rgba(124, 58, 237, 0.2);
-    --primary-hover: #6d28d9;
+    --primary: #5e7a46;
+    --primary-glow: rgba(94, 122, 70, 0.2);
+    --primary-hover: #485f34;
 
-    --danger: #ef4444;
-    --danger-glow: rgba(239, 68, 68, 0.15);
-    --warning: #f59e0b;
-    --warning-glow: rgba(245, 158, 11, 0.15);
-    --success: #10b981;
-    --success-glow: rgba(16, 185, 129, 0.15);
+    --danger: #cf3d3d;
+    --danger-glow: rgba(207, 61, 61, 0.12);
+    --warning: #cc841f;
+    --warning-glow: rgba(204, 132, 31, 0.12);
+    --success: #448c4e;
+    --success-glow: rgba(68, 140, 78, 0.12);
 }
 
 * {
@@ -159,8 +159,8 @@ body::after {
 
 .logo-icon {
     font-size: 28px;
-    color: #818cf8;
-    text-shadow: 0 0 12px rgba(129, 140, 248, 0.4);
+    color: #8ba86e;
+    text-shadow: 0 0 12px rgba(139, 168, 110, 0.4);
 }
 
 .logo-text h2 {
@@ -208,9 +208,9 @@ body::after {
 }
 
 .nav-btn.active {
-    background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+    background: linear-gradient(135deg, #8ba86e 0%, var(--primary) 100%);
     color: #ffffff;
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+    box-shadow: 0 4px 15px rgba(98, 130, 71, 0.3);
 }
 
 .nav-section-title {
@@ -275,10 +275,10 @@ body::after {
 }
 
 .step-nav-btn.active .step-circle {
-    background: #7c3aed;
-    border-color: #7c3aed;
+    background: var(--primary);
+    border-color: var(--primary);
     color: #ffffff;
-    box-shadow: 0 0 10px rgba(124, 58, 237, 0.4);
+    box-shadow: 0 0 10px var(--primary-glow);
 }
 
 .badge {
@@ -906,7 +906,7 @@ textarea:focus {
 }
 
 .review-grid-table th {
-    background: #eef2ff;
+    background: #f0f4ee;
     color: var(--text-primary);
     font-size: 11px;
     font-weight: 700;
@@ -927,11 +927,11 @@ textarea:focus {
 }
 
 .review-grid-table tr:hover {
-    background: rgba(124, 58, 237, 0.03);
+    background: rgba(98, 130, 71, 0.03);
 }
 
 .review-grid-table tr.selected {
-    background: rgba(124, 58, 237, 0.07);
+    background: rgba(98, 130, 71, 0.07);
 }
 
 /* Review Status badge styles */
@@ -961,8 +961,8 @@ textarea:focus {
 }
 
 .status-badge.not-reviewed {
-    background: rgba(124, 58, 237, 0.06);
-    color: #6d28d9;
+    background: var(--primary-glow);
+    color: var(--primary-hover);
 }
 
 /* Grid edit boxes */

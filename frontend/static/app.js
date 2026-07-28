@@ -249,13 +249,22 @@ async function triggerExtraction(directApprove = false) {
                 const card = document.getElementById('success-export-card');
                 card.style.display = 'flex';
 
-                document.getElementById('link-excel-download').href = res.downloadOutputUrl;
-                document.getElementById('link-report-download').href = res.downloadReviewReportTxtUrl;
-                document.getElementById('link-json-download').href = res.downloadReviewReportJsonUrl;
+                const excelLink = document.getElementById('link-excel-download');
+                excelLink.href = res.downloadOutputUrl;
+                excelLink.setAttribute('download', res.outputFile || 'bulk_upload.xlsx');
+
+                const reportLink = document.getElementById('link-report-download');
+                reportLink.href = res.downloadReviewReportTxtUrl;
+                reportLink.setAttribute('download', res.downloadReviewReportTxtUrl.split('/').pop());
+
+                const jsonLink = document.getElementById('link-json-download');
+                jsonLink.href = res.downloadReviewReportJsonUrl;
+                jsonLink.setAttribute('download', res.downloadReviewReportJsonUrl.split('/').pop());
 
                 // Programmatic download trigger
                 const link = document.createElement('a');
                 link.href = res.downloadOutputUrl;
+                link.setAttribute('download', res.outputFile || 'bulk_upload.xlsx');
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -1177,9 +1186,17 @@ async function approveAndDownloadExcel() {
             const card = document.getElementById('success-export-card');
             card.style.display = 'flex';
 
-            document.getElementById('link-excel-download').href = res.downloadOutputUrl;
-            document.getElementById('link-report-download').href = res.downloadReviewReportTxtUrl;
-            document.getElementById('link-json-download').href = res.downloadReviewReportJsonUrl;
+            const excelLink = document.getElementById('link-excel-download');
+            excelLink.href = res.downloadOutputUrl;
+            excelLink.setAttribute('download', res.outputFile || 'bulk_upload.xlsx');
+
+            const reportLink = document.getElementById('link-report-download');
+            reportLink.href = res.downloadReviewReportTxtUrl;
+            reportLink.setAttribute('download', res.reviewReportTxt || 'report.txt');
+
+            const jsonLink = document.getElementById('link-json-download');
+            jsonLink.href = res.downloadReviewReportJsonUrl;
+            jsonLink.setAttribute('download', res.reviewReportJson || 'report.json');
 
             alert('Excel file and review reports successfully generated! Select download links below.');
         } else {

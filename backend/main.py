@@ -418,7 +418,9 @@ async def create_new_draft(
         update_draft_item(draft_id, v_item["id"], v_item, user="AI Extractor")
         
     if direct_approve:
-        output_filename = f"Menu_Ninja_Bulk_Upload_{business_name.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        import re
+        safe_business_name = re.sub(r'[\\/*?:"<>| ]', "_", business_name)
+        output_filename = f"{safe_business_name}_Menu_Ninja.xlsx"
         output_path = OUTPUT_DIR / output_filename
         
         # update draft details status to Approved
@@ -433,8 +435,8 @@ async def create_new_draft(
         draft = get_draft(draft_id)
         export_approved_menu(DEFAULT_TEMPLATE, output_path, draft["items"], business_name)
         
-        report_json_name = f"review_report_{draft_id}.json"
-        report_txt_name = f"review_report_{draft_id}.txt"
+        report_json_name = f"{safe_business_name}_review_report.json"
+        report_txt_name = f"{safe_business_name}_review_report.txt"
         report_json_path = OUTPUT_DIR / report_json_name
         report_txt_path = OUTPUT_DIR / report_txt_name
         
@@ -586,14 +588,16 @@ def approve_and_export_menu(draft_id: str, payload: Dict[str, Any] = Body(...)):
             save_learned_correction("category", initial_cat, final_cat)
             
     # Export excel using the dynamic template
-    output_filename = f"naman_bulk_{draft['businessName'].replace(' ', '_')}_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    import re
+    safe_business_name = re.sub(r'[\\/*?:"<>| ]', "_", draft['businessName'])
+    output_filename = f"{safe_business_name}_Menu_Ninja.xlsx"
     output_path = OUTPUT_DIR / output_filename
     
     export_approved_menu(DEFAULT_TEMPLATE, output_path, validated_items, draft["businessName"])
     
     # Generate Review Report
-    report_json_name = f"review_report_{draft_id}.json"
-    report_txt_name = f"review_report_{draft_id}.txt"
+    report_json_name = f"{safe_business_name}_review_report.json"
+    report_txt_name = f"{safe_business_name}_review_report.txt"
     report_json_path = OUTPUT_DIR / report_json_name
     report_txt_path = OUTPUT_DIR / report_txt_name
     

@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
-API_URL = "https://menuninjabynamank.onrender.com/api/drafts"
+API_URL = "http://127.0.0.1:8000/api/drafts"
 IMAGE_FILE = Path(r"c:\Users\Amonex\QuickMenuAgent\uploads\aedb656387_WhatsApp Image 2026-07-27 at 1.48.13 PM.jpeg")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 

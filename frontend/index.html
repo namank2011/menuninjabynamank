@@ -199,7 +199,11 @@
                             </div>
                             <div class="form-group">
                                 <label for="form-station">Default kitchen station</label>
-                                <input type="text" id="form-station" value="Kitchen">
+                                <select id="form-station"
+                                    style="border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--card-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; width: 100%;">
+                                    <option value="Kitchen" selected>Kitchen</option>
+                                    <option value="Bar">Bar</option>
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label for="form-prep-time">Default prep time</label>

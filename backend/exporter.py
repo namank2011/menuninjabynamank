@@ -111,13 +111,26 @@ def export_approved_menu(
         # 1. Classify Item Type and Station
         if (cat_words & liquor_keywords) or (name_words & liquor_keywords):
             item_type = "liquor"
-            station = "beverage"
         elif (cat_words & beverage_keywords) or (name_words & beverage_keywords):
             item_type = "beverage"
-            station = "beverage"
         else:
             item_type = "food"
-            station = "kitchen"
+
+        # Determine station (respect user-provided custom option if non-empty, otherwise class-infer)
+        item_station = item.get("station")
+        if item_station and str(item_station).strip():
+            station_str = str(item_station).strip()
+            if station_str.lower() in ["beverage", "bar", "liquor"]:
+                station = "Bar"
+            elif station_str.lower() in ["kitchen", "food"]:
+                station = "Kitchen"
+            else:
+                station = station_str
+        else:
+            if item_type in ["liquor", "beverage"]:
+                station = "Bar"
+            else:
+                station = "Kitchen"
             
         # 2. Dynamic Tag Inference (Veg / Non Veg / Egg prediction fallback)
         dietary_tag = str(item.get("dietaryTag", "")).lower().strip()
