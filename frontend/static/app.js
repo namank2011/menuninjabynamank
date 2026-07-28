@@ -1159,7 +1159,7 @@ function toggleFinalExportButton() {
 async function approveAndDownloadExcel() {
     const btn = document.getElementById('final-export-xlsx-btn');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Finalizing Menu Ninja Document...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Finalizing menu for export...`;
 
     // Save changes first
     await saveDraftProgress(true);
