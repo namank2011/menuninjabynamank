@@ -100,7 +100,7 @@ import json
 import base64
 import time
 from fastapi.security import APIKeyCookie
-from fastapi import Security, Depends, HTTPException
+from fastapi import Security, Depends, HTTPException, Header
 
 SECRET_KEY = os.getenv("AUTH_SECRET_KEY", "super-secret-ninja-key-12345")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -129,9 +129,22 @@ def verify_token(token: str) -> Optional[dict]:
     except Exception:
         return None
 
-def get_current_user(token: Optional[str] = Depends(session_cookie)):
+def get_current_user(
+    token_cookie: Optional[str] = Depends(session_cookie),
+    authorization: Optional[str] = Header(None),
+    x_session_token: Optional[str] = Header(None, alias="X-Session-Token")
+):
+    token = token_cookie
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1]
+    if not token and x_session_token:
+        token = x_session_token
+        
+    if token:
+        token = token.strip('"').strip("'")
+
     if not token:
-        raise HTTPException(status_code=401, detail="Authentication session cookie required.")
+        raise HTTPException(status_code=401, detail="Authentication session cookie or token required.")
     
     payload = verify_token(token)
     if not payload or "email" not in payload:
@@ -529,99 +542,61 @@ async def create_new_draft(
             use_gemini_batch = False
 
     if not use_gemini_batch:
-        import concurrent.futures
-
-        def process_single_file(menu_file, file_path, file_info):
+        for menu_file, file_path, file_info in saved_paths:
             import time
             start_time = time.time()
             try:
                 extraction = extract_menu_from_file(file_path, engine=extraction_engine, api_key=x_gemini_api_key)
                 execution_seconds = time.time() - start_time
-                return {
-                    "success": True,
-                    "extraction": extraction,
-                    "execution_seconds": execution_seconds,
-                    "menu_file": menu_file,
-                    "file_path": file_path,
-                    "file_info": file_info
-                }
-            except Exception as err:
-                execution_seconds = time.time() - start_time
-                return {
-                    "success": False,
-                    "error": err,
-                    "execution_seconds": execution_seconds,
-                    "menu_file": menu_file,
-                    "file_path": file_path,
-                    "file_info": file_info
-                }
-
-        # Run extraction in parallel using ThreadPoolExecutor
-        max_workers = min(4, len(saved_paths))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_file = {
-                executor.submit(process_single_file, menu_file, file_path, file_info): menu_file
-                for menu_file, file_path, file_info in saved_paths
-            }
-            
-            for future in concurrent.futures.as_completed(future_to_file):
-                res = future.result()
-                menu_file = res["menu_file"]
-                file_path = res["file_path"]
-                file_info = res["file_info"]
-                file_info["timeSeconds"] = round(res["execution_seconds"], 2)
+                file_info["timeSeconds"] = round(execution_seconds, 2)
+                print(f"Extraction for {menu_file.filename} took {execution_seconds:.2f} seconds using engine '{extraction_engine}'.")
                 
-                if res["success"]:
-                    extraction = res["extraction"]
-                    print(f"Extraction for {menu_file.filename} took {res['execution_seconds']:.2f} seconds using engine '{extraction_engine}'.")
-                    for page_item in extraction.items:
-                        # Map variations
-                        variations = []
-                        for v in page_item.variations:
-                            variations.append({
-                                "name": v.name,
-                                "sellingPrice": v.price,
-                                "listingPrice": v.listing_price,
-                                "confidence": page_item.confidence
-                            })
-                            
-                        mapped_item = {
-                            "source": {
-                                "fileName": menu_file.filename,
-                                "page": 1,
-                                "rawText": page_item.source_text,
-                                "confidence": page_item.confidence,
-                                "initialCategory": page_item.category or "Uncategorized",
-                                "initialProductName": page_item.product_name
-                            },
-                            "categoryName": page_item.category or "Uncategorized",
-                            "productName": page_item.product_name,
-                            "variantGroupName": "Portion" if any(n.lower() in ["half", "full"] for n in [v["name"] for v in variations]) else ("Size" if len(variations) > 1 else ""),
-                            "variations": variations,
-                            "description": page_item.description or "",
-                            "dietaryTag": page_item.dietary_tag or default_dietary,
-                            "masterStatus": master_status,
-                            "menuStatus": menu_status,
-                            "stockStatus": stock_status,
-                            "itemCode": page_item.item_code or "",
-                            "station": page_item.station or station,
-                            "preparationTime": page_item.preparation_time or preparation_time,
-                            "imageUrl1": page_item.image_url_1 or "",
-                            "imageUrl2": "",
-                            "imageUrl3": "",
-                            "taxCategory": tax_category,
-                            "taxType": tax_type,
-                            "taxValue": tax_value,
-                            "reviewStatus": "Not Reviewed",
-                            "approved": True if direct_approve else False
-                        }
-                        all_extracted_items.append(mapped_item)
-                else:
-                    err = res["error"]
-                    print(f"Error extracting from {menu_file.filename}: {err}")
-                    errors_encountered.append(f"{menu_file.filename}: {str(err)}")
-                    
-                # Clean up temp file
+                for page_item in extraction.items:
+                    # Map variations
+                    variations = []
+                    for v in page_item.variations:
+                        variations.append({
+                            "name": v.name,
+                            "sellingPrice": v.price,
+                            "listingPrice": v.listing_price,
+                            "confidence": page_item.confidence
+                        })
+                        
+                    mapped_item = {
+                        "source": {
+                            "fileName": menu_file.filename,
+                            "page": 1,
+                            "rawText": page_item.source_text,
+                            "confidence": page_item.confidence,
+                            "initialCategory": page_item.category or "Uncategorized",
+                            "initialProductName": page_item.product_name
+                        },
+                        "categoryName": page_item.category or "Uncategorized",
+                        "productName": page_item.product_name,
+                        "variantGroupName": "Portion" if any(n.lower() in ["half", "full"] for n in [v["name"] for v in variations]) else ("Size" if len(variations) > 1 else ""),
+                        "variations": variations,
+                        "description": page_item.description or "",
+                        "dietaryTag": page_item.dietary_tag or default_dietary,
+                        "masterStatus": master_status,
+                        "menuStatus": menu_status,
+                        "stockStatus": stock_status,
+                        "itemCode": page_item.item_code or "",
+                        "station": page_item.station or station,
+                        "preparationTime": page_item.preparation_time or preparation_time,
+                        "imageUrl1": page_item.image_url_1 or "",
+                        "imageUrl2": "",
+                        "imageUrl3": "",
+                        "taxCategory": tax_category,
+                        "taxType": tax_type,
+                        "taxValue": tax_value,
+                        "reviewStatus": "Not Reviewed",
+                        "approved": True if direct_approve else False
+                    }
+                    all_extracted_items.append(mapped_item)
+            except Exception as err:
+                print(f"Error extracting from {menu_file.filename}: {err}")
+                errors_encountered.append(f"{menu_file.filename}: {str(err)}")
+            finally:
                 if file_path.exists():
                     try:
                         os.remove(file_path)

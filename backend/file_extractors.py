@@ -979,11 +979,7 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
                 try:
                     print("Using Ollama for text PDF extraction...")
                     chunks = _chunk_text_by_lines(text, max_chars=3000)[:3]
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as executor:
-                        extractions = list(executor.map(
-                            lambda chunk: extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
-                            chunks
-                        ))
+                    extractions = [extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for chunk in chunks]
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
@@ -1022,11 +1018,7 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
             if use_ollama:
                 try:
                     print("Using Ollama for scanned PDF vision extraction...")
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=len(image_paths[:3])) as executor:
-                        extractions = list(executor.map(
-                            lambda img_path: extract_from_image_with_ollama(img_path, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
-                            image_paths[:3]
-                        ))
+                    extractions = [extract_from_image_with_ollama(img_path, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for img_path in image_paths[:3]]
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
@@ -1039,8 +1031,7 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
             if use_heuristics:
                 print("Using local OCR + Heuristics for scanned PDF...")
                 extracted = MenuExtraction(currency="INR", items=[], document_notes=["Local OCR + Heuristics failed to extract menu items from scanned PDF."])
-                with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(image_paths))) as executor:
-                    ocr_texts = list(executor.map(extract_text_from_image_via_ocr, image_paths))
+                ocr_texts = [extract_text_from_image_via_ocr(img_path) for img_path in image_paths]
                 combined_text = "\n".join(ocr_texts)
                 if combined_text.strip():
                     heur = parse_menu_text_heuristically(combined_text)
@@ -1091,11 +1082,7 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
         try:
             print("Using Ollama for Word/Text document extraction...")
             chunks = _chunk_text_by_lines(text, max_chars=3000)[:3]
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as executor:
-                extractions = list(executor.map(
-                    lambda chunk: extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
-                    chunks
-                ))
+            extractions = [extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for chunk in chunks]
             return merge_extractions(extractions)
         except Exception as e:
             if engine == "ollama":

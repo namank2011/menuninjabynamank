@@ -16,10 +16,29 @@ def run_test():
         print(f"Error: Sample image not found at {IMAGE_FILE}")
         return
 
+    # Use a requests session to persist cookies
+    session = requests.Session()
+
+    # Log in first
+    print("Logging in to obtain session token...")
+    login_url = "http://127.0.0.1:8000/api/auth/login"
+    login_res = session.post(login_url, json={
+        "email": "namankshetri2@gmail.com",
+        "password": "2011@Naman"
+    })
+    if login_res.status_code != 200:
+        print(f"Authentication failed (status code: {login_res.status_code}): {login_res.text}")
+        return
+    print("Authenticated successfully.")
+    
+    session_token = session.cookies.get("session_token") or login_res.cookies.get("session_token")
+    cookie_header = {"Cookie": f"session_token={session_token}"} if session_token else {}
+
     print(f"Sending e2e extract request for '{IMAGE_FILE.name}' -> {API_URL}")
     
     headers = {
-        "X-Gemini-API-Key": GEMINI_KEY
+        "X-Gemini-API-Key": GEMINI_KEY,
+        **cookie_header
     }
     
     files = [
@@ -43,7 +62,7 @@ def run_test():
     }
 
     try:
-        r = requests.post(API_URL, headers=headers, files=files, data=data, timeout=120)
+        r = session.post(API_URL, headers=headers, files=files, data=data, timeout=120)
         print(f"Response Code: {r.status_code}")
         response_json = r.json()
         print("Response JSON:")
@@ -54,7 +73,7 @@ def run_test():
             print(f"\nDraft successfully created with id: {draft_id}")
             print("Retrieving verified details...")
             
-            r_details = requests.get(f"{API_URL}/{draft_id}", headers=headers, timeout=30)
+            r_details = session.get(f"{API_URL}/{draft_id}", headers=headers, timeout=30)
             details = r_details.json()
             items = details.get("items", [])
             print(f"Extracted product count: {len(items)}")

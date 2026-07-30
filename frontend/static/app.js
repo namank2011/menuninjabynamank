@@ -3,8 +3,21 @@
     const originalFetch = window.fetch;
     const API_BASE = "https://menuninjabynamank.onrender.com";
     window.fetch = function (url, options) {
-        if (typeof url === 'string' && url.startsWith('/api')) {
-            if (window.location.hostname.endsWith('vercel.app')) {
+        options = options || {};
+        options.headers = options.headers || {};
+
+        // Attach token from localStorage as fallback for third-party cookie restrictions
+        const token = localStorage.getItem('session_token');
+        if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+            options.headers['X-Session-Token'] = token;
+        }
+
+        // Cross-origin request detection for cookies (API credentials inclusion)
+        const isVercel = window.location.hostname.endsWith('vercel.app') || window.location.hostname.includes('vercel');
+        if (isVercel) {
+            options.credentials = 'include';
+            if (typeof url === 'string' && url.startsWith('/api')) {
                 url = API_BASE + url;
             }
         }
@@ -368,6 +381,13 @@ async function loadDraftsList() {
         const r = await fetch('/api/drafts');
         const list = await r.json();
         const tbody = document.getElementById('drafts-list-body');
+        if (!tbody) return;
+
+        if (!Array.isArray(list)) {
+            console.error("Failed loading drafts list (not an array):", list);
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state error-text">Session expired or unauthorized. Please sign in again.</td></tr>`;
+            return;
+        }
 
         if (list.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No drafts found. Try creating a new menu digitization.</td></tr>`;
@@ -552,9 +572,15 @@ function updateFooterSummary() {
 
 function renderTableStage1() {
     const tbody = document.getElementById('stage1-table-body');
-    const searchVal = document.getElementById('stage1-search').value.toLowerCase();
-    const catVal = document.getElementById('stage1-filter-cat').value || 'all';
-    const confVal = document.getElementById('stage1-filter-conf').value;
+    if (!tbody) return;
+    if (!currentDraft || !currentDraft.items) return;
+
+    const searchInput = document.getElementById('stage1-search');
+    const searchVal = searchInput ? searchInput.value.toLowerCase() : '';
+    const catInput = document.getElementById('stage1-filter-cat');
+    const catVal = catInput ? (catInput.value || 'all') : 'all';
+    const confInput = document.getElementById('stage1-filter-conf');
+    const confVal = confInput ? confInput.value : 'all';
 
     // Filter list
     const filtered = currentDraft.items.filter(it => {
@@ -809,6 +835,8 @@ function bulkApproveItems() {
 
 function renderTableStage2() {
     const tbody = document.getElementById('stage2-table-body');
+    if (!tbody) return;
+    if (!currentDraft || !currentDraft.items) return;
     tbody.innerHTML = '';
 
     // Filter items with errors/warnings
@@ -868,6 +896,9 @@ function quickFixModal(itemId) {
 
 function renderCategoryReview() {
     const container = document.getElementById('category-cards-list');
+    if (!container) return;
+    if (!currentDraft || !currentDraft.items) return;
+
     const sourceSelect = document.getElementById('merge-source');
     const targetSelect = document.getElementById('merge-target');
 
@@ -963,6 +994,8 @@ function executeCategoryMerge() {
 
 function renderVariationsReview() {
     const container = document.getElementById('variations-grid-list');
+    if (!container) return;
+    if (!currentDraft || !currentDraft.items) return;
     container.innerHTML = '';
 
     // Filter products containing variations
@@ -1025,6 +1058,8 @@ function renderVariationsReview() {
 
 function renderMenuPreview() {
     const container = document.getElementById('menu-preview-container');
+    if (!container) return;
+    if (!currentDraft || !currentDraft.items) return;
     document.getElementById('preview-menu-business').textContent = currentDraft.businessName;
 
     // Group approved items by category
@@ -1096,6 +1131,8 @@ function renderMenuPreview() {
 
 function renderFinalApproval() {
     const list = document.getElementById('final-validation-checklist');
+    if (!list) return;
+    if (!currentDraft || !currentDraft.items) return;
     list.innerHTML = '';
 
     let totalCount = currentDraft.items.length;
@@ -1606,10 +1643,12 @@ async function checkAuthentication() {
             currentUser = await meRes.json();
             onLoginSuccess(currentUser, googleClientId);
         } else {
+            localStorage.removeItem('session_token');
             onLoginRequired(googleClientId);
         }
     } catch (e) {
         console.error("Auth check failed:", e);
+        localStorage.removeItem('session_token');
         onLoginRequired("");
     }
 }
@@ -1688,6 +1727,9 @@ async function handleGoogleLoginResponse(response) {
 
         if (res.ok) {
             const data = await res.json();
+            if (data.token) {
+                localStorage.setItem('session_token', data.token);
+            }
             showToast('Google login successful!', 'success');
             onLoginSuccess(data.user);
         } else {
@@ -1723,6 +1765,9 @@ async function handleEmailLogin(event) {
 
         if (res.ok) {
             const data = await res.json();
+            if (data.token) {
+                localStorage.setItem('session_token', data.token);
+            }
             showToast('Welcome back, Ninja!', 'success');
             onLoginSuccess(data.user);
         } else {
@@ -1740,6 +1785,7 @@ async function handleEmailLogin(event) {
 async function handleLogout() {
     try {
         await fetch('/api/auth/logout', { method: 'POST' });
+        localStorage.removeItem('session_token');
         showToast('You have signed out gracefully.', 'success');
         checkAuthentication();
     } catch (e) {
