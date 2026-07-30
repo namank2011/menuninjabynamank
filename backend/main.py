@@ -10,7 +10,7 @@ import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, File, Form, UploadFile, Query, Body, Header
+from fastapi import FastAPI, File, Form, UploadFile, Query, Body, Header, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,13 +48,31 @@ FRONTEND_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="Menu Ninja Menu Agent by Naman Kshetri", version="1.0.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.middleware("http")
+async def dynamic_cors_credentials_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    
+    # Handle preflight (OPTIONS) requests
+    if request.method == "OPTIONS" and origin:
+        response = Response(status_code=204)
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = request.headers.get(
+            "Access-Control-Request-Headers", "Content-Type, Authorization, Cookie"
+        )
+        return response
+        
+    response = await call_next(request)
+    
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = request.headers.get(
+            "Access-Control-Request-Headers", "Content-Type, Authorization, Cookie"
+        )
+    return response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -176,8 +194,8 @@ def login(payload: Dict[str, Any] = Body(...)):
         value=token,
         httponly=True,
         max_age=86400 * 7,
-        samesite="lax",
-        secure=False
+        samesite="none",
+        secure=True
     )
     return response
 
@@ -223,8 +241,8 @@ def google_auth(payload: Dict[str, Any] = Body(...)):
             value=token,
             httponly=True,
             max_age=86400 * 7,
-            samesite="lax",
-            secure=False
+            samesite="none",
+            secure=True
         )
         return response
         
@@ -234,7 +252,7 @@ def google_auth(payload: Dict[str, Any] = Body(...)):
 @app.post("/api/auth/logout")
 def logout():
     response = JSONResponse(content={"status": "success"})
-    response.delete_cookie("session_token")
+    response.delete_cookie("session_token", samesite="none", secure=True)
     return response
 
 @app.get("/api/auth/me")
