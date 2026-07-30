@@ -1803,34 +1803,35 @@ async function loadUsersList() {
                 return;
             }
             tbody.innerHTML = users.map(u => {
-                const label = u.role === 'super_admin' ? '<span class="status-badge" style="background:#8e44ad; color:white; padding:2px 6px; border-radius:3px; font-weight:600;">Super Admin</span>' : '<span class="status-badge" style="background:#5e72e4; color:white; padding:2px 6px; border-radius:3px; font-weight:600;">Reviewer</span>';
+                const label = u.role === 'super_admin'
+                    ? '<span class="role-badge-admin"><i class="fa-solid fa-user-shield"></i> Super Admin</span>'
+                    : '<span class="role-badge-reviewer"><i class="fa-solid fa-user"></i> Reviewer</span>';
                 const statusChecked = u.is_allowed ? 'checked' : '';
                 const isSuperAdminEmail = u.email === 'namankshetri2@gmail.com';
                 const toggleDisabled = isSuperAdminEmail ? 'disabled' : '';
-                const deleteDisabled = isSuperAdminEmail ? 'display:none;' : 'display:inline-block;';
 
-                return `<tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 12px; font-weight:600; color:var(--text-main);">${escapeHtml(u.email)}</td>
-                    <td style="padding: 12px;">${label}</td>
-                    <td style="padding: 12px; color:var(--text-muted);">${new Date(u.created_at).toLocaleString()}</td>
-                    <td style="padding: 12px;">
-                        <label class="switch" style="position:relative; display:inline-block; width:44px; height:22px; vertical-align:middle;">
-                            <input type="checkbox" ${statusChecked} ${toggleDisabled} onchange="toggleUserAccess('${u.email}', this.checked)" style="opacity:0; width:0; height:0;">
-                            <span class="slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px;"></span>
+                return `<tr class="whitelist-row">
+                    <td class="whitelist-table-cell-bold">${escapeHtml(u.email)}</td>
+                    <td class="whitelist-table-cell">${label}</td>
+                    <td class="whitelist-table-cell-muted">${new Date(u.created_at).toLocaleString()}</td>
+                    <td class="whitelist-table-cell">
+                        <label class="whitelist-switch-label">
+                            <input type="checkbox" class="whitelist-switch-input" ${statusChecked} ${toggleDisabled} onchange="toggleUserAccess('${u.email}', this.checked)">
+                            <span class="whitelist-switch-slider"></span>
                         </label>
                     </td>
-                    <td style="padding: 12px; text-align:right;">
-                        <button onclick="deleteUserWhitelist('${u.email}')" class="secondary-btn btn-sm" style="color:#e74c3c; border-color:#f5b7b1; ${deleteDisabled}">
+                    <td class="whitelist-table-cell-right">
+                        <button onclick="deleteUserWhitelist('${u.email}')" class="secondary-btn btn-sm ${isSuperAdminEmail ? 'whitelist-btn-delete-hidden' : 'whitelist-btn-delete-visible'}">
                             <i class="fa-solid fa-trash"></i> Delete
                         </button>
                     </td>
                 </tr>`;
             }).join('');
         } else {
-            tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:#e74c3c;">Failed to load whitelisted users.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state whitelist-error-state">Failed to load whitelisted users.</td></tr>`;
         }
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:#e74c3c;">Connection error: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state whitelist-error-state">Connection error: ${e.message}</td></tr>`;
     }
 }
 

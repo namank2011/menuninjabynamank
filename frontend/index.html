@@ -15,8 +15,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Identity Services Client for OAuth login -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- Stylesheet -->
-    <link rel="stylesheet" href="static/style.css?v=1.2.0">
+    <link rel="stylesheet" href="static/style.css?v=1.3.0">
 </head>
 
 <body class="light-mode">
@@ -145,15 +144,14 @@
 
             <!-- User Whitelist View -->
             <section id="view-users" class="content-view">
-                <div class="dashboard-grid" style="margin-bottom: 20px;">
-                    <div class="dash-welcome-card glassmorphic"
-                        style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div class="welcome-text" style="text-align: left;">
+                <div class="dashboard-grid">
+                    <div class="dash-welcome-card glassmorphic whitelist-welcome-wrapper">
+                        <div class="welcome-text">
                             <h3>User Whitelist Management</h3>
-                            <p style="margin: 5px 0 0 0;">Grant dashboard permissions and manage whitelisted email IDs
-                                for Google Authentication & private login access.</p>
+                            <p>Grant dashboard permissions and manage whitelisted email IDs for Google Authentication &
+                                private login access.</p>
                         </div>
-                        <button class="primary-btn" onclick="openAddUserModal()" style="flex-shrink: 0;">
+                        <button class="primary-btn" onclick="openAddUserModal()">
                             <i class="fa-solid fa-user-plus"></i> Whitelist New User
                         </button>
                     </div>
@@ -163,20 +161,15 @@
                     <div class="section-header">
                         <h2>Authorized Platform Users</h2>
                     </div>
-                    <div class="drafts-table-container glassmorphic" style="overflow-x: auto;">
-                        <table class="grid-table" style="width: 100%; border-collapse: collapse;">
+                    <div class="drafts-table-container glassmorphic whitelist-table-wrapper">
+                        <table class="grid-table whitelist-table">
                             <thead>
-                                <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
-                                    <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">User Email
-                                    </th>
-                                    <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Role</th>
-                                    <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Whitelist
-                                        Date</th>
-                                    <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Allowed
-                                        Access</th>
-                                    <th
-                                        style="padding: 12px; font-weight: 600; color: var(--text-muted); text-align: right;">
-                                        Actions</th>
+                                <tr class="whitelist-table-hdr">
+                                    <th class="whitelist-table-header-cell">User Email</th>
+                                    <th class="whitelist-table-header-cell">Role</th>
+                                    <th class="whitelist-table-header-cell">Whitelist Date</th>
+                                    <th class="whitelist-table-header-cell">Allowed Access</th>
+                                    <th class="whitelist-table-header-cell-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="whitelist-users-body">
@@ -735,7 +728,7 @@
         </div>
     </div>
 
-    <script src="static/app.js?v=1.2.0"></script>
+    <script src="static/app.js?v=1.3.0"></script>
 </body>
 
 </html>
