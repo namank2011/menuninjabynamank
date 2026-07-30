@@ -22,61 +22,42 @@
 <body class="light-mode">
 
     <!-- Login View (Glassmorphic authentication overlay) -->
-    <div id="login-container"
-        style="display: flex; min-height: 100vh; width: 100%; align-items: center; justify-content: center; background: radial-gradient(circle, var(--accent-light) 0%, rgba(240, 243, 237, 0.95) 100%); z-index: 10000; position: fixed; top: 0; left: 0; font-family: 'Outfit', sans-serif;">
-        <div class="login-card glassmorphic"
-            style="width: 100%; max-width: 420px; padding: 40px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 8px 32px 0 rgba(119, 137, 105, 0.15); background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); text-align: center;">
-            <div id="login-logo" style="margin-bottom: 24px;">
-                <i class="fa-solid fa-user-ninja"
-                    style="font-size: 48px; color: var(--accent-color); margin-bottom: 12px;"></i>
-                <h2
-                    style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: #2c3e50; font-size: 26px; margin: 0;">
-                    Menu Ninja Login</h2>
-                <p style="color: var(--text-muted); font-size: 13px; margin: 6px 0 0 0;">Authorized access only | by
-                    Naman Kshetri</p>
+    <div id="login-container">
+        <div class="login-card glassmorphic">
+            <div id="login-logo" class="login-logo-container">
+                <i class="fa-solid fa-user-ninja login-logo-icon"></i>
+                <h2 class="login-logo-title">Menu Ninja Login</h2>
+                <p class="login-logo-subtitle">Authorized access only | by Naman Kshetri</p>
             </div>
 
-            <div id="google-signin-section"
-                style="margin-top: 15px; margin-bottom: 25px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div id="google-signin-section" class="google-signin-container">
                 <div id="g_id_onload" data-context="signin" data-ux_mode="popup" data-auto_prompt="false">
                 </div>
-                <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline"
-                    data-text="signin_with" data-size="large" data-logo_alignment="left" style="display: inline-block;">
+                <div class="g_id_signin google-signin-wrapper" data-type="standard" data-shape="rectangular"
+                    data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left">
                 </div>
-                <div id="google-desc-alert" style="font-size: 11px; color: #95a5a6; display: none;">Configure
+                <div id="google-desc-alert" class="google-desc-warning">Configure
                     GOOGLE_CLIENT_ID in your .env to enable Google Authentication</div>
             </div>
 
-            <div
-                style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px; color: #cbd5e1; font-size: 12px; font-weight: 500;">
-                <span
-                    style="border-bottom: 1px solid #e2e8f0; width: 35%; display: inline-block; margin-right: 10px;"></span>
-                <span style="color: #94a3b8; text-transform: uppercase;">or email login</span>
-                <span
-                    style="border-bottom: 1px solid #e2e8f0; width: 35%; display: inline-block; margin-left: 10px;"></span>
+            <div class="login-divider-container">
+                <span class="login-divider-line login-divider-line-left"></span>
+                <span class="login-divider-label">or email login</span>
+                <span class="login-divider-line login-divider-line-right"></span>
             </div>
 
-            <form id="email-login-form" onsubmit="handleEmailLogin(event)"
-                style="text-align: left; display: flex; flex-direction: column; gap: 16px;">
+            <form id="email-login-form" onsubmit="handleEmailLogin(event)" class="login-email-form">
                 <div>
-                    <label for="login-email"
-                        style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;">Email
-                        address</label>
+                    <label for="login-email" class="login-form-group-label">Email address</label>
                     <input type="email" id="login-email" required placeholder="name@company.com"
-                        style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: inherit; font-size: 14px; background: rgba(255,255,255,0.8); transition: border-color 0.2s;"
-                        onfocus="this.style.borderColor='var(--accent-color)'"
-                        onblur="this.style.borderColor='#cbd5e1'">
+                        class="login-form-group-input">
                 </div>
                 <div>
-                    <label for="login-password"
-                        style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;">Password</label>
+                    <label for="login-password" class="login-form-group-label">Password</label>
                     <input type="password" id="login-password" required placeholder="••••••••"
-                        style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: inherit; font-size: 14px; background: rgba(255,255,255,0.8); transition: border-color 0.2s;"
-                        onfocus="this.style.borderColor='var(--accent-color)'"
-                        onblur="this.style.borderColor='#cbd5e1'">
+                        class="login-form-group-input">
                 </div>
-                <button type="submit" id="btn-login-submit" class="primary-btn"
-                    style="width: 100%; padding: 12px; border-radius: 8px; font-weight: 600; font-size: 15px; margin-top: 10px; display: inline-flex; align-items: center; justify-content: center; box-shadow: none;">
+                <button type="submit" id="btn-login-submit" class="primary-btn login-form-submit-btn">
                     Sign In to Space
                 </button>
             </form>
@@ -96,17 +77,12 @@
             </div>
 
             <!-- User Profile Area -->
-            <div id="user-profile-section"
-                style="padding: 10px 12px; margin: 8px 12px; background: rgba(0,0,0,0.03); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-family: inherit;">
-                <div
-                    style="display: flex; align-items: center; gap: 8px; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    <i class="fa-solid fa-circle-user"
-                        style="font-size: 16px; color: var(--accent-color); flex-shrink: 0;"></i>
-                    <span id="logged-in-email"
-                        style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-color);">loading...</span>
+            <div id="user-profile-section" class="user-profile-box">
+                <div class="user-profile-identity">
+                    <i class="fa-solid fa-circle-user user-profile-icon"></i>
+                    <span id="logged-in-email" class="user-profile-email">loading...</span>
                 </div>
-                <button onclick="handleLogout()" title="Logout"
-                    style="border: none; background: transparent; cursor: pointer; color: #e74c3c; font-size: 14px; padding: 4px; display: flex; align-items: center;">
+                <button onclick="handleLogout()" title="Logout" class="user-logout-btn">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </button>
             </div>
@@ -702,27 +678,22 @@
     </div>
 
     <!-- Settings Modal -->
-    <div class="modal" id="settings-modal"
-        style="display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 1100;">
-        <div class="modal-content glassmorphic"
-            style="max-width: 450px; width: 90%; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px var(--shadow-color);">
-            <div class="modal-header"
-                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Settings & API Config</h3>
-                <button class="close-btn" onclick="toggleSettingsModal()"
-                    style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+    <div class="settings-modal-box" id="settings-modal">
+        <div class="settings-card glassmorphic">
+            <div class="settings-header">
+                <h3 class="settings-title">Settings & API Config</h3>
+                <button class="settings-close-btn" onclick="toggleSettingsModal()">&times;</button>
             </div>
-            <div class="modal-body">
-                <div class="form-group" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px;">
-                    <label for="settings-gemini-key" style="font-weight: 500; font-size: 14px;">Google Gemini API
-                        Key</label>
+            <div class="settings-body">
+                <div class="settings-group">
+                    <label for="settings-gemini-key" class="settings-label">Google Gemini API Key</label>
                     <input type="password" id="settings-gemini-key" placeholder="Enter your Gemini API key (AIzaSy...)"
-                        style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--body-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; box-sizing: border-box;">
-                    <span style="font-size: 12px; color: var(--text-muted); display: block; line-height: 1.4;">This key
-                        is stored locally in your browser and used for extraction on any device.</span>
+                        class="settings-input">
+                    <span class="settings-hint">This key is stored locally in your browser and used for extraction on
+                        any device.</span>
                 </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <div class="settings-footer">
                 <button class="secondary-btn" onclick="toggleSettingsModal()">Cancel</button>
                 <button class="primary-btn" onclick="saveSettings()">Save Settings</button>
             </div>
@@ -730,43 +701,33 @@
     </div>
 
     <!-- Whitelist Add User Modal -->
-    <div class="modal" id="add-user-modal"
-        style="display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 1200;">
-        <div class="modal-content glassmorphic"
-            style="max-width: 450px; width: 90%; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px var(--shadow-color);">
-            <div class="modal-header"
-                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Whitelist Web Account</h3>
-                <button class="close-btn" onclick="toggleAddUserModal()"
-                    style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+    <div class="add-user-modal-box" id="add-user-modal">
+        <div class="add-user-card glassmorphic">
+            <div class="add-user-header">
+                <h3 class="add-user-title">Whitelist Web Account</h3>
+                <button class="add-user-close-btn" onclick="toggleAddUserModal()">&times;</button>
             </div>
             <form id="add-user-form" onsubmit="handleAddUserSubmit(event)">
-                <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
-                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="new-user-email" style="font-weight: 500; font-size: 14px;">User Email
-                            Address</label>
+                <div class="add-user-body">
+                    <div class="add-user-group">
+                        <label for="new-user-email" class="add-user-label">User Email Address</label>
                         <input type="email" id="new-user-email" required
-                            placeholder="user@gmail.com or business@company.com"
-                            style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--body-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; box-sizing: border-box;">
+                            placeholder="user@gmail.com or business@company.com" class="add-user-input">
                     </div>
-                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="new-user-role" style="font-weight: 500; font-size: 14px;">System Role</label>
-                        <select id="new-user-role"
-                            style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--body-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; box-sizing: border-box;">
+                    <div class="add-user-group">
+                        <label for="new-user-role" class="add-user-label">System Role</label>
+                        <select id="new-user-role" class="add-user-select">
                             <option value="user">Standard Reviewer</option>
                             <option value="super_admin">Super Administrator</option>
                         </select>
                     </div>
-                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="new-user-password" style="font-weight: 500; font-size: 14px;">Platform Password
-                            (Optional)</label>
+                    <div class="add-user-group">
+                        <label for="new-user-password" class="add-user-label">Platform Password (Optional)</label>
                         <input type="password" id="new-user-password"
-                            placeholder="Enter password (if login without Google)"
-                            style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--body-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; box-sizing: border-box;">
+                            placeholder="Enter password (if login without Google)" class="add-user-input">
                     </div>
                 </div>
-                <div class="modal-footer"
-                    style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <div class="add-user-footer">
                     <button type="button" class="secondary-btn" onclick="toggleAddUserModal()">Cancel</button>
                     <button type="submit" class="primary-btn">Whitelist Account</button>
                 </div>
