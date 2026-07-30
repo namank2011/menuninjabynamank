@@ -124,8 +124,8 @@ body::after {
 /* Glassmorphism utility */
 .glassmorphic {
     background: var(--bg-glass);
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
     border: 1px solid var(--border-glass);
     border-radius: 16px;
     box-shadow: 0 8px 32px rgba(90, 115, 62, 0.08);
@@ -551,6 +551,7 @@ button {
     padding-left: 28px;
     cursor: pointer;
     font-size: 14px;
+    -webkit-user-select: none;
     user-select: none;
     color: var(--text-primary);
 }
@@ -1466,8 +1467,8 @@ textarea:focus {
 
 /* Stepper sticky bottom footer page control bar */
 .review-flow-footer {
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
     background: rgba(246, 248, 245, 0.95);
     border-top: 1px solid #ccd5cd;
     bottom: 0;
@@ -1499,6 +1500,7 @@ textarea:focus {
     width: 100vw;
     height: 100vh;
     background: rgba(0, 0, 0, 0.65);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     z-index: 200;
     align-items: center;
@@ -1615,7 +1617,7 @@ textarea:focus {
         display: flex;
         flex-direction: column;
         grid-template-columns: 1fr;
-        min-height: auto;
+        min-height: 0;
     }
 
     .review-sidebar-column {
