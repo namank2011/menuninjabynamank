@@ -67,9 +67,25 @@ def init_db():
         updated_at TEXT,
         defaults TEXT,  -- JSON string of default values
         files TEXT,     -- JSON list of uploaded file metadata
-        status TEXT     -- 'Draft', 'Approved'
+        status TEXT,    -- 'Draft', 'Approved'
+        created_by TEXT -- email of the user who created this draft
     )
     """)
+
+    # Migration: add created_by column if missing (for existing databases)
+    try:
+        cursor.execute("SELECT created_by FROM drafts LIMIT 1")
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        run_ddl("ALTER TABLE drafts ADD COLUMN created_by TEXT")
+        # Backfill existing drafts to super admin
+        try:
+            cursor.execute("UPDATE drafts SET created_by = 'namankshetri2@gmail.com' WHERE created_by IS NULL")
+        except Exception:
+            pass
     
     # Draft Items Table
     run_ddl("""
@@ -190,15 +206,15 @@ def execute_query(query: str, params: tuple = (), commit: bool = False) -> List[
     conn.close()
     return result
 
-def create_draft(business_name: str, defaults: Dict[str, Any], files: List[Dict[str, Any]]) -> str:
+def create_draft(business_name: str, defaults: Dict[str, Any], files: List[Dict[str, Any]], created_by: str = "namankshetri2@gmail.com") -> str:
     draft_id = uuid.uuid4().hex[:12]
     now = datetime.datetime.now().isoformat()
     execute_query(
-        "INSERT INTO drafts (id, business_name, created_at, updated_at, defaults, files, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (draft_id, business_name, now, now, json.dumps(defaults), json.dumps(files), "Draft"),
+        "INSERT INTO drafts (id, business_name, created_at, updated_at, defaults, files, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (draft_id, business_name, now, now, json.dumps(defaults), json.dumps(files), "Draft", created_by),
         commit=True
     )
-    log_audit(draft_id, "CREATE_DRAFT", f"Draft created for {business_name}")
+    log_audit(draft_id, "CREATE_DRAFT", f"Draft created for {business_name}", user=created_by)
     return draft_id
 
 def log_audit(draft_id: str, action: str, details: str, user: str = "Human Reviewer"):
@@ -303,11 +319,13 @@ def update_draft_item(draft_id: str, item_id: str, item: Dict[str, Any], user: s
             log_audit(draft_id, "UPDATE_ITEM", f"Updated product '{new_name}' ({item_id}): " + ", ".join(changes), user)
 
 def get_draft(draft_id: str) -> Optional[Dict[str, Any]]:
-    rows = execute_query("SELECT id, business_name, created_at, updated_at, defaults, files, status FROM drafts WHERE id = ?", (draft_id,))
+    rows = execute_query("SELECT id, business_name, created_at, updated_at, defaults, files, status, created_by FROM drafts WHERE id = ?", (draft_id,))
     if not rows:
         return None
     
-    d_id, bus_name, created, updated, defaults, files, status = rows[0]
+    row = rows[0]
+    d_id, bus_name, created, updated, defaults, files, status = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+    created_by = row[7] if len(row) > 7 else "namankshetri2@gmail.com"
     
     # Get items
     item_rows = execute_query("""
@@ -353,18 +371,28 @@ def get_draft(draft_id: str) -> Optional[Dict[str, Any]]:
         "defaults": json.loads(defaults or "{}"),
         "files": json.loads(files or "[]"),
         "status": status,
+        "createdBy": created_by,
         "items": items
     }
 
-def get_all_drafts() -> List[Dict[str, Any]]:
-    rows = execute_query("SELECT id, business_name, created_at, updated_at, status FROM drafts ORDER BY updated_at DESC")
-    return [{
-        "id": r[0],
-        "businessName": r[1],
-        "createdAt": r[2],
-        "updatedAt": r[3],
-        "status": r[4]
-    } for r in rows]
+def get_all_drafts(user_email: str = None, user_role: str = None) -> List[Dict[str, Any]]:
+    """Return drafts filtered by ownership. Super admins see all; operators see only their own."""
+    if user_role == "super_admin" or not user_email:
+        rows = execute_query("SELECT id, business_name, created_at, updated_at, status, created_by FROM drafts ORDER BY updated_at DESC")
+    else:
+        rows = execute_query("SELECT id, business_name, created_at, updated_at, status, created_by FROM drafts WHERE LOWER(created_by) = LOWER(?) ORDER BY updated_at DESC", (user_email,))
+    
+    results = []
+    for r in rows:
+        results.append({
+            "id": r[0],
+            "businessName": r[1],
+            "createdAt": r[2],
+            "updatedAt": r[3],
+            "status": r[4],
+            "createdBy": r[5] if len(r) > 5 else None
+        })
+    return results
 
 def delete_draft(draft_id: str):
     execute_query("DELETE FROM drafts WHERE id = ?", (draft_id,), commit=True)

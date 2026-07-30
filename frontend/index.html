@@ -94,7 +94,7 @@
                     <i class="fa-solid fa-plus"></i> New Extraction
                 </button>
                 <button class="nav-btn" id="btn-users" onclick="switchView('users')" style="display: none;">
-                    <i class="fa-solid fa-user-shield"></i> User Whitelist
+                    <i class="fa-solid fa-user-shield"></i> User Management
                 </button>
                 <div class="nav-section-title">Review Steps</div>
                 <div class="stages-links">
@@ -147,12 +147,12 @@
                 <div class="dashboard-grid">
                     <div class="dash-welcome-card glassmorphic whitelist-welcome-wrapper">
                         <div class="welcome-text">
-                            <h3>User Whitelist Management</h3>
-                            <p>Grant dashboard permissions and manage whitelisted email IDs for Google Authentication &
-                                private login access.</p>
+                            <h3>User Management</h3>
+                            <p>Create and manage user accounts. Assign roles (Super Admin or Menu Operator) and control
+                                dashboard access permissions.</p>
                         </div>
                         <button class="primary-btn" onclick="openAddUserModal()">
-                            <i class="fa-solid fa-user-plus"></i> Whitelist New User
+                            <i class="fa-solid fa-user-plus"></i> Add New User
                         </button>
                     </div>
                 </div>
@@ -693,36 +693,46 @@
         </div>
     </div>
 
-    <!-- Whitelist Add User Modal -->
+    <!-- Add User / Whitelist Modal -->
     <div class="add-user-modal-box" id="add-user-modal">
         <div class="add-user-card glassmorphic">
             <div class="add-user-header">
-                <h3 class="add-user-title">Whitelist Web Account</h3>
+                <h3 class="add-user-title"><i class="fa-solid fa-user-plus" style="margin-right:8px;"></i>Create New
+                    User Account</h3>
                 <button class="add-user-close-btn" onclick="toggleAddUserModal()">&times;</button>
             </div>
             <form id="add-user-form" onsubmit="handleAddUserSubmit(event)">
                 <div class="add-user-body">
                     <div class="add-user-group">
                         <label for="new-user-email" class="add-user-label">User Email Address</label>
-                        <input type="email" id="new-user-email" required
-                            placeholder="user@gmail.com or business@company.com" class="add-user-input">
+                        <input type="email" id="new-user-email" required placeholder="operator@company.com"
+                            class="add-user-input">
                     </div>
                     <div class="add-user-group">
-                        <label for="new-user-role" class="add-user-label">System Role</label>
-                        <select id="new-user-role" class="add-user-select">
-                            <option value="user">Standard Reviewer</option>
+                        <label for="new-user-role" class="add-user-label">User Role</label>
+                        <select id="new-user-role" class="add-user-select" onchange="onRoleSelectChange()">
+                            <option value="user" selected>Menu Operator</option>
                             <option value="super_admin">Super Administrator</option>
                         </select>
+                        <p id="role-desc-text"
+                            style="font-size:11px; color:var(--text-secondary); margin:6px 0 0 0; line-height:1.4;">
+                            <i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>
+                            Menu Operators can upload, extract, review and download their own menus only.
+                        </p>
                     </div>
                     <div class="add-user-group">
-                        <label for="new-user-password" class="add-user-label">Platform Password (Optional)</label>
-                        <input type="password" id="new-user-password"
-                            placeholder="Enter password (if login without Google)" class="add-user-input">
+                        <label for="new-user-password" class="add-user-label">Login Password <span
+                                id="pwd-required-star" style="color:#e74c3c;">*</span></label>
+                        <input type="password" id="new-user-password" required
+                            placeholder="Create a secure password for this user" class="add-user-input" minlength="6">
+                        <p style="font-size:11px; color:var(--text-secondary); margin:4px 0 0 0;">Minimum 6 characters.
+                            Used for email/password login.</p>
                     </div>
                 </div>
                 <div class="add-user-footer">
                     <button type="button" class="secondary-btn" onclick="toggleAddUserModal()">Cancel</button>
-                    <button type="submit" class="primary-btn">Whitelist Account</button>
+                    <button type="submit" class="primary-btn"><i class="fa-solid fa-user-check"
+                            style="margin-right:6px;"></i>Create Account</button>
                 </div>
             </form>
         </div>

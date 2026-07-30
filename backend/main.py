@@ -166,6 +166,14 @@ def get_super_admin(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Super-admin access required")
     return current_user
 
+def require_draft_access(draft, user):
+    """Check if user has access to a draft. Super admins can access all drafts.
+    Menu operators can only access drafts they created."""
+    if user["role"] == "super_admin":
+        return True
+    draft_owner = (draft.get("createdBy") or "").lower()
+    return draft_owner == user["email"].lower()
+
 # Auth endpoints
 @app.get("/api/auth/config")
 def get_auth_config():
@@ -368,13 +376,15 @@ async def extract_menu(
 
 @app.get("/api/drafts")
 def list_drafts(user=Depends(get_current_user)):
-    return get_all_drafts()
+    return get_all_drafts(user_email=user["email"], user_role=user["role"])
 
 @app.get("/api/drafts/{draft_id}")
 def get_draft_details(draft_id: str, user=Depends(get_current_user)):
     draft = get_draft(draft_id)
     if not draft:
         return JSONResponse(status_code=404, content={"error": "Draft not found"})
+    if not require_draft_access(draft, user):
+        return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
     
     # Run dynamic validation engine on read to ensure they are calculated fresh
     items = draft.get("items", [])
@@ -638,8 +648,8 @@ async def create_new_draft(
             
     all_extracted_items = deduped_items
             
-    # Save draft inside database
-    draft_id = create_draft(business_name, defaults_dict, saved_files)
+    # Save draft inside database with ownership tracking
+    draft_id = create_draft(business_name, defaults_dict, saved_files, created_by=user["email"])
     
     # Save template path to metadata
     defaults_dict["templatePath"] = str(template_path)
@@ -701,6 +711,8 @@ def update_draft(draft_id: str, data: Dict[str, Any] = Body(...), user=Depends(g
     draft = get_draft(draft_id)
     if not draft:
         return JSONResponse(status_code=404, content={"error": "Draft not found"})
+    if not require_draft_access(draft, user):
+        return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
         
     # Update business defaults or metadata if provided
     new_defaults = data.get("defaults", draft.get("defaults"))
@@ -722,11 +734,21 @@ def update_draft(draft_id: str, data: Dict[str, Any] = Body(...), user=Depends(g
 
 @app.delete("/api/drafts/{draft_id}")
 def delete_draft_api(draft_id: str, user=Depends(get_current_user)):
+    draft = get_draft(draft_id)
+    if not draft:
+        return JSONResponse(status_code=404, content={"error": "Draft not found"})
+    if not require_draft_access(draft, user):
+        return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
     delete_draft(draft_id)
     return {"status": "success"}
 
 @app.get("/api/drafts/{draft_id}/audit")
 def get_audit_trail(draft_id: str, user=Depends(get_current_user)):
+    draft = get_draft(draft_id)
+    if not draft:
+        return JSONResponse(status_code=404, content={"error": "Draft not found"})
+    if not require_draft_access(draft, user):
+        return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
     return get_audit_logs(draft_id)
 
 @app.post("/api/drafts/{draft_id}/generate-descriptions")
@@ -743,6 +765,8 @@ def generate_batch_descriptions(
     draft = get_draft(draft_id)
     if not draft:
         return JSONResponse(status_code=404, content={"error": "Draft not found"})
+    if not require_draft_access(draft, user):
+        return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
         
     updated_count = 0
     for item in draft.get("items", []):
@@ -797,6 +821,8 @@ def approve_and_export_menu(draft_id: str, payload: Dict[str, Any] = Body(...), 
     draft = get_draft(draft_id)
     if not draft:
         return JSONResponse(status_code=404, content={"error": "Draft not found"})
+    if not require_draft_access(draft, user):
+        return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
         
     # Re-run final validation
     validated_items = validate_menu(draft["items"], DEFAULT_TEMPLATE)

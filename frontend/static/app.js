@@ -1662,12 +1662,15 @@ function onLoginSuccess(user, googleClientId) {
     document.getElementById('logged-in-email').textContent = user.email;
     document.getElementById('logged-in-email').title = user.email;
 
+    const isAdmin = user.role === 'super_admin';
+
+    // User Management nav button: admin only
     const usersBtn = document.getElementById('btn-users');
-    if (user.role === 'super_admin') {
-        if (usersBtn) usersBtn.style.display = 'flex';
-    } else {
-        if (usersBtn) usersBtn.style.display = 'none';
-    }
+    if (usersBtn) usersBtn.style.display = isAdmin ? 'flex' : 'none';
+
+    // Settings button: admin only
+    const settingsBtn = document.getElementById('btn-settings');
+    if (settingsBtn) settingsBtn.style.display = isAdmin ? 'flex' : 'none';
 
     loadDraftsList();
 }
@@ -1793,17 +1796,30 @@ async function handleLogout() {
     }
 }
 
-// ----------------- WHITELIST MANAGEMENT FLOW -----------------
+// ----------------- USER MANAGEMENT FLOW -----------------
 function toggleAddUserModal() {
     const modal = document.getElementById('add-user-modal');
     modal.style.display = modal.style.display === 'none' || !modal.style.display ? 'flex' : 'none';
     if (modal.style.display === 'flex') {
         document.getElementById('add-user-form').reset();
+        onRoleSelectChange();
     }
 }
 
 function openAddUserModal() {
     toggleAddUserModal();
+}
+
+function onRoleSelectChange() {
+    const role = document.getElementById('new-user-role').value;
+    const desc = document.getElementById('role-desc-text');
+    if (desc) {
+        if (role === 'super_admin') {
+            desc.innerHTML = '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i> Super Administrators have full access: user management, settings, and all menus across the system.';
+        } else {
+            desc.innerHTML = '<i class="fa-solid fa-circle-info" style="margin-right:4px;"></i> Menu Operators can upload, extract, review and download their own menus only.';
+        }
+    }
 }
 
 async function handleAddUserSubmit(event) {
@@ -1812,25 +1828,31 @@ async function handleAddUserSubmit(event) {
     const role = document.getElementById('new-user-role').value;
     const password = document.getElementById('new-user-password').value;
 
+    if (!password || password.length < 6) {
+        showToast('Password is required and must be at least 6 characters.', 'error');
+        return;
+    }
+
     try {
         const res = await fetch('/api/users', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email, role, password: password || null })
+            body: JSON.stringify({ email, role, password })
         });
 
         if (res.ok) {
-            showToast('User whitelisted successfully!', 'success');
+            const roleName = role === 'super_admin' ? 'Super Administrator' : 'Menu Operator';
+            showToast(`User created as ${roleName}!`, 'success');
             toggleAddUserModal();
             loadUsersList();
         } else {
             const err = await res.json();
-            showToast(err.error || 'Failed to add user', 'error');
+            showToast(err.error || 'Failed to create user', 'error');
         }
     } catch (e) {
-        showToast('Error adding user: ' + e.message, 'error');
+        showToast('Error creating user: ' + e.message, 'error');
     }
 }
 
@@ -1851,7 +1873,7 @@ async function loadUsersList() {
             tbody.innerHTML = users.map(u => {
                 const label = u.role === 'super_admin'
                     ? '<span class="role-badge-admin"><i class="fa-solid fa-user-shield"></i> Super Admin</span>'
-                    : '<span class="role-badge-reviewer"><i class="fa-solid fa-user"></i> Reviewer</span>';
+                    : '<span class="role-badge-reviewer"><i class="fa-solid fa-user"></i> Menu Operator</span>';
                 const statusChecked = u.is_allowed ? 'checked' : '';
                 const isSuperAdminEmail = u.email === 'namankshetri2@gmail.com';
                 const toggleDisabled = isSuperAdminEmail ? 'disabled' : '';
@@ -1943,4 +1965,5 @@ window.openAddUserModal = openAddUserModal;
 window.handleAddUserSubmit = handleAddUserSubmit;
 window.toggleUserAccess = toggleUserAccess;
 window.deleteUserWhitelist = deleteUserWhitelist;
+window.onRoleSelectChange = onRoleSelectChange;
 
