@@ -4,7 +4,7 @@
     const API_BASE = "https://menuninjabynamank.onrender.com";
     window.fetch = function (url, options) {
         if (typeof url === 'string' && url.startsWith('/api')) {
-            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            if (window.location.hostname.endsWith('vercel.app')) {
                 url = API_BASE + url;
             }
         }
