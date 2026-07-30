@@ -853,7 +853,7 @@ def extract_text_from_image_via_ocr(image_path: Path) -> str:
     return ""
 
 
-def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Optional[str] = None) -> MenuExtraction:
+def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key: Optional[str] = None) -> MenuExtraction:
     path = Path(path)
     suffix = path.suffix.lower()
     engine = str(engine).lower().strip()
@@ -979,7 +979,11 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                 try:
                     print("Using Ollama for text PDF extraction...")
                     chunks = _chunk_text_by_lines(text, max_chars=3000)[:3]
-                    extractions = [extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for chunk in chunks]
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as executor:
+                        extractions = list(executor.map(
+                            lambda chunk: extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
+                            chunks
+                        ))
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
@@ -1018,7 +1022,11 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
             if use_ollama:
                 try:
                     print("Using Ollama for scanned PDF vision extraction...")
-                    extractions = [extract_from_image_with_ollama(img_path, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for img_path in image_paths[:3]]
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=len(image_paths[:3])) as executor:
+                        extractions = list(executor.map(
+                            lambda img_path: extract_from_image_with_ollama(img_path, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
+                            image_paths[:3]
+                        ))
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
@@ -1030,10 +1038,9 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
                         use_heuristics = True
             if use_heuristics:
                 print("Using local OCR + Heuristics for scanned PDF...")
-                ocr_texts = []
                 extracted = MenuExtraction(currency="INR", items=[], document_notes=["Local OCR + Heuristics failed to extract menu items from scanned PDF."])
-                for img_path in image_paths:
-                    ocr_texts.append(extract_text_from_image_via_ocr(img_path))
+                with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(image_paths))) as executor:
+                    ocr_texts = list(executor.map(extract_text_from_image_via_ocr, image_paths))
                 combined_text = "\n".join(ocr_texts)
                 if combined_text.strip():
                     heur = parse_menu_text_heuristically(combined_text)
@@ -1084,7 +1091,11 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
         try:
             print("Using Ollama for Word/Text document extraction...")
             chunks = _chunk_text_by_lines(text, max_chars=3000)[:3]
-            extractions = [extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for chunk in chunks]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as executor:
+                extractions = list(executor.map(
+                    lambda chunk: extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
+                    chunks
+                ))
             return merge_extractions(extractions)
         except Exception as e:
             if engine == "ollama":
@@ -1105,4 +1116,44 @@ def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Opti
         if 'ollama_failed_note' in locals():
             extracted.document_notes.append(ollama_failed_note)
         return extracted
+
+
+def apply_learned_corrections_to_extraction(extraction: MenuExtraction) -> MenuExtraction:
+    try:
+        from database import get_learned_corrections
+        cat_memory = get_learned_corrections("category")
+        prod_memory = get_learned_corrections("product_name")
+    except Exception as e:
+        print(f"Could not load learned memory for post-processing mapping: {e}")
+        return extraction
+
+    if not cat_memory and not prod_memory:
+        return extraction
+
+    for item in extraction.items:
+        # Match product name
+        if item.product_name:
+            p_name_lower = item.product_name.lower().strip()
+            if p_name_lower in prod_memory:
+                corrected_name = prod_memory[p_name_lower]
+                if item.product_name != corrected_name:
+                    print(f"[Learning Memory] Auto-corrected product name: '{item.product_name}' -> '{corrected_name}'")
+                    item.product_name = corrected_name
+        
+        # Match category name
+        if item.category:
+            cat_lower = item.category.lower().strip()
+            if cat_lower in cat_memory:
+                corrected_cat = cat_memory[cat_lower]
+                if item.category != corrected_cat:
+                    print(f"[Learning Memory] Auto-corrected category: '{item.category}' -> '{corrected_cat}'")
+                    item.category = corrected_cat
+
+    return extraction
+
+
+def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Optional[str] = None) -> MenuExtraction:
+    extraction = _extract_menu_from_file_raw(path, engine, api_key)
+    return apply_learned_corrections_to_extraction(extraction)
+
 

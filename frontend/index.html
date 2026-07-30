@@ -279,6 +279,39 @@
                                 <span id="telemetry-text">Processed via Gemini in 4.5s</span>
                             </div>
 
+                            <!-- Premium Guide Banner -->
+                            <div class="user-guide-banner glassmorphic" id="review-guide-banner"
+                                style="background: rgba(94, 122, 70, 0.05); border-left: 5px solid var(--primary); margin-bottom: 20px; padding: 16px 20px; position: relative;">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <h4
+                                        style="color: var(--primary); display: flex; align-items: center; gap: 8px; font-size: 15px; margin: 0;">
+                                        <i class="fa-solid fa-lightbulb"></i> <strong>Pro Review Tips &
+                                            Instructions</strong>
+                                    </h4>
+                                    <button class="secondary-btn btn-sm" onclick="toggleGuideBanner()"
+                                        style="padding: 2px 8px; font-size: 11px; background: transparent; border: 1px solid var(--border-glass);">
+                                        <span id="guide-toggle-text">Hide Guide</span> <i class="fa-solid fa-chevron-up"
+                                            id="guide-toggle-icon"></i>
+                                    </button>
+                                </div>
+                                <div id="guide-banner-content">
+                                    <ul
+                                        style="margin-left: 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; padding: 0;">
+                                        <li><strong>Required Verification:</strong> Red margins indicate validation
+                                            errors (missing name or selling price). Click any cell to edit details
+                                            directly in the table.</li>
+                                        <li><strong>Managing Variations:</strong> For products with multiple
+                                            sizes/prices, separate options with a hash <code>#</code> (e.g. Variation:
+                                            <code>Half#Full</code>, Selling Price: <code>100#180</code>). Ensure key
+                                            lengths match.</li>
+                                        <li><strong>Interactive Helpers:</strong> Select any row to view full OCR source
+                                            and compare text. Use <strong>Generate description</strong> to automatically
+                                            write AI-powered descriptions.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
                             <div class="toolbar glassmorphic">
                                 <div class="toolbar-left">
                                     <div class="search-box">

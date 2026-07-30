@@ -22,10 +22,14 @@ VALIDATION_DEFAULTS = {
     "Incentive Type": ["AMT", "%"]
 }
 
-def load_validation_lists(template_path: Path) -> Dict[str, List[str]]:
+import os
+from functools import lru_cache
+
+@lru_cache(maxsize=16)
+def _cached_load_validation_lists(path_str: str, mtime: float) -> Dict[str, List[str]]:
     lists = {}
     try:
-        wb = load_workbook(str(template_path), read_only=True)
+        wb = load_workbook(path_str, read_only=True)
         if "Validation" in wb.sheetnames:
             ws = wb["Validation"]
             for col in range(1, ws.max_column + 1):
@@ -51,9 +55,18 @@ def load_validation_lists(template_path: Path) -> Dict[str, List[str]]:
             
     # Normalize empty tags
     if "" not in lists.get("Dietary Tag", []):
-        lists.setdefault("Dietary Tag", []).append("")
-        
+         lists.setdefault("Dietary Tag", []).append("")
+         
     return lists
+
+def load_validation_lists(template_path: Path) -> Dict[str, List[str]]:
+    try:
+        path_str = str(template_path.resolve())
+        mtime = os.path.getmtime(path_str)
+        return _cached_load_validation_lists(path_str, mtime)
+    except Exception:
+        # Fallback if resolving or mtime fails
+        return _cached_load_validation_lists(str(template_path), 0.0)
 
 def validate_item(item: Dict[str, Any], validation_lists: Dict[str, List[str]], all_items: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     errors = []

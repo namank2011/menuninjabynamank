@@ -269,7 +269,7 @@ async function triggerExtraction(directApprove = false) {
                 link.click();
                 document.body.removeChild(link);
 
-                alert('Success! Menu was extracted, validated against template instructions, formatted, and downloaded directly.');
+                showToast('Success! Menu was extracted, validated against template instructions, formatted, and downloaded directly.', 'success');
             } else {
                 // Traditional review flow
                 document.querySelector('.stepper-progress').style.display = 'flex';
@@ -278,14 +278,14 @@ async function triggerExtraction(directApprove = false) {
                 document.querySelector('.approval-agreement-card').style.display = 'block';
                 document.querySelector('.validation-summary-card').style.display = 'block';
 
-                alert('Menu extraction complete! Entering Stage 1 Raw Review.');
+                showToast('Menu extraction complete! Entering Stage 1 Raw Review.', 'success');
                 await loadDraft(res.draftId);
             }
         } else {
-            alert('Extraction failed: ' + (res.error || 'Unknown error'));
+            showToast('Extraction failed: ' + (res.error || 'Unknown error'), 'error');
         }
     } catch (e) {
-        alert('Request failed: ' + e.message);
+        showToast('Request failed: ' + e.message, 'error');
     } finally {
         btn.innerHTML = originalHtml;
         updateExtractionBtnState();
@@ -349,11 +349,11 @@ async function loadDraft(draftId) {
 
             goToStep(1); // Start from Stage 1
         } else {
-            alert('Failed loading draft detail.');
+            showToast('Failed loading draft detail.', 'error');
             switchView('dashboard');
         }
     } catch (e) {
-        alert('Network error loading draft: ' + e.message);
+        showToast('Network error loading draft: ' + e.message, 'error');
     }
 }
 
@@ -793,7 +793,7 @@ function bulkApproveItems() {
             approvedCount++;
         }
     });
-    alert(`Bulk approved ${approvedCount} products (skipped items with blocking errors).`);
+    showToast(`Bulk approved ${approvedCount} products (skipped items with blocking errors).`, 'success');
     revalidateLocalMenu();
     renderTableStage1();
     updateFooterSummary();
@@ -1198,14 +1198,14 @@ async function approveAndDownloadExcel() {
             jsonLink.href = res.downloadReviewReportJsonUrl;
             jsonLink.setAttribute('download', res.reviewReportJson || 'report.json');
 
-            alert('Excel file and review reports successfully generated! Select download links below.');
+            showToast('Excel file and review reports successfully generated! Select download links below.', 'success');
         } else {
-            alert('Approval failed: ' + (res.error || 'Unknown error'));
+            showToast('Approval failed: ' + (res.error || 'Unknown error'), 'error');
             btn.innerHTML = `<i class="fa-solid fa-file-excel"></i> Generate & Download Menu Ninja Excel File`;
             btn.disabled = false;
         }
     } catch (e) {
-        alert('Network request error: ' + e.message);
+        showToast('Network request error: ' + e.message, 'error');
         btn.innerHTML = `<i class="fa-solid fa-file-excel"></i> Generate & Download Menu Ninja Excel File`;
         btn.disabled = false;
     }
@@ -1305,12 +1305,12 @@ async function generateSingleDescription() {
                 else if (currentStep === 2) renderTableStage2();
                 updateFooterSummary();
             }
-            alert('AI description generated successfully!');
+            showToast('AI description generated successfully!', 'success');
         } else {
-            alert('Generation failed. Make sure Ollama contains the text model llama3.1:latest and is online.');
+            showToast('Generation failed. Make sure Ollama contains the text model llama3.1:latest and is online.', 'error');
         }
     } catch (e) {
-        alert('Description generator failed: ' + e.message);
+        showToast('Description generator failed: ' + e.message, 'error');
     } finally {
         triggerBtn.disabled = false;
         triggerBtn.innerHTML = `<i class="fa-solid fa-robot"></i> Generate description`;
@@ -1353,15 +1353,15 @@ async function saveDraftProgress(silent = false) {
             }
 
             if (!silent) {
-                alert('Draft progress successfully stored in database!');
+                showToast('Draft progress successfully stored in database!', 'success');
                 // Redraw
                 goToStep(currentStep);
             }
         } else {
-            alert('Failed saving progress draft.');
+            showToast('Failed saving progress draft.', 'error');
         }
     } catch (e) {
-        alert('Network saving error: ' + e.message);
+        showToast('Network saving error: ' + e.message, 'error');
     }
 }
 
@@ -1398,7 +1398,7 @@ async function toggleAuditLogsModal() {
                 modal.classList.add('active');
             }
         } catch (e) {
-            alert('Failed loading audit logs.');
+            showToast('Failed loading audit logs.', 'error');
         }
     }
 }
@@ -1508,6 +1508,41 @@ function revalidateLocalMenu() {
 }
 
 // ----------------- HELPERS -----------------
+function showToast(message, type = 'success') {
+    const existing = document.getElementById('app-toast');
+    if (existing) {
+        existing.remove();
+    }
+    const toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i>
+        <span>${escapeHtml(message)}</span>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.classList.add('visible'); }, 10);
+    setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => { toast.remove(); }, 300);
+    }, 4000);
+}
+
+function toggleGuideBanner() {
+    const content = document.getElementById('guide-banner-content');
+    const text = document.getElementById('guide-toggle-text');
+    const icon = document.getElementById('guide-toggle-icon');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        text.innerText = 'Hide Guide';
+        icon.className = 'fa-solid fa-chevron-up';
+    } else {
+        content.style.display = 'none';
+        text.innerText = 'Show Guide';
+        icon.className = 'fa-solid fa-chevron-down';
+    }
+}
+
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -1546,6 +1581,6 @@ function toggleSettingsModal() {
 function saveSettings() {
     const key = document.getElementById("settings-gemini-key").value.trim();
     localStorage.setItem("gemini_api_key", key);
-    alert("Settings saved successfully!");
+    showToast("Settings saved successfully!", 'success');
     toggleSettingsModal();
 }
