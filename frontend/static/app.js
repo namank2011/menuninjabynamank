@@ -24,8 +24,8 @@ let selectedItemId = null; // Item ID currently selected for compare pane
 document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     initUploadEvents();
-    loadDraftsList();
     loadSavedSettings();
+    checkAuthentication();
 });
 
 // Switch major views: dashboard, create, review-flow
@@ -48,6 +48,12 @@ function switchView(viewName) {
         document.getElementById('save-draft-btn').style.display = 'none';
         document.getElementById('audit-log-toggle').style.display = 'none';
         clearUploadForm();
+    } else if (viewName === 'users') {
+        const usersBtn = document.getElementById('btn-users');
+        if (usersBtn) usersBtn.classList.add('active');
+        document.getElementById('save-draft-btn').style.display = 'none';
+        document.getElementById('audit-log-toggle').style.display = 'none';
+        loadUsersList();
     } else if (viewName === 'review-flow') {
         document.getElementById('save-draft-btn').style.display = 'inline-flex';
         document.getElementById('audit-log-toggle').style.display = 'inline-flex';
@@ -1584,3 +1590,310 @@ function saveSettings() {
     showToast("Settings saved successfully!", 'success');
     toggleSettingsModal();
 }
+
+// ----------------- SECURITY & AUTHENTICATION FLOW -----------------
+let currentUser = null;
+
+async function checkAuthentication() {
+    try {
+        const [configRes, meRes] = await Promise.all([
+            fetch('/api/auth/config').then(r => r.json()).catch(() => ({})),
+            fetch('/api/auth/me')
+        ]);
+
+        const googleClientId = configRes ? configRes.google_client_id : "";
+        if (meRes.ok) {
+            currentUser = await meRes.json();
+            onLoginSuccess(currentUser, googleClientId);
+        } else {
+            onLoginRequired(googleClientId);
+        }
+    } catch (e) {
+        console.error("Auth check failed:", e);
+        onLoginRequired("");
+    }
+}
+
+function onLoginSuccess(user, googleClientId) {
+    currentUser = user;
+
+    document.getElementById('login-container').style.display = 'none';
+    document.querySelector('.app-container').style.display = 'flex';
+
+    document.getElementById('logged-in-email').textContent = user.email;
+    document.getElementById('logged-in-email').title = user.email;
+
+    const usersBtn = document.getElementById('btn-users');
+    if (user.role === 'super_admin') {
+        if (usersBtn) usersBtn.style.display = 'flex';
+    } else {
+        if (usersBtn) usersBtn.style.display = 'none';
+    }
+
+    loadDraftsList();
+}
+
+function onLoginRequired(googleClientId) {
+    currentUser = null;
+    document.getElementById('login-container').style.display = 'flex';
+    document.querySelector('.app-container').style.display = 'none';
+
+    initGoogleAuth(googleClientId);
+}
+
+function initGoogleAuth(clientId) {
+    const section = document.getElementById('google-signin-section');
+    const alertBox = document.getElementById('google-desc-alert');
+    const loginCard = document.querySelector('.g_id_signin');
+
+    if (!clientId) {
+        if (alertBox) alertBox.style.display = 'block';
+        if (loginCard) loginCard.style.display = 'none';
+        return;
+    }
+
+    if (alertBox) alertBox.style.display = 'none';
+    if (loginCard) loginCard.style.display = 'inline-block';
+
+    try {
+        google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleLoginResponse
+        });
+        google.accounts.id.renderButton(
+            document.querySelector(".g_id_signin"),
+            { theme: "outline", size: "large", width: "320" }
+        );
+        google.accounts.id.prompt();
+    } catch (e) {
+        console.error("Google auth init error:", e);
+    }
+}
+
+async function handleGoogleLoginResponse(response) {
+    const token = response.credential;
+    const submitBtn = document.getElementById('btn-login-submit');
+    submitBtn.disabled = true;
+    const oldText = submitBtn.innerHTML;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Google Sign In...`;
+
+    try {
+        const res = await fetch('/api/auth/google', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ credential: token })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            showToast('Google login successful!', 'success');
+            onLoginSuccess(data.user);
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Google login failed', 'error');
+        }
+    } catch (e) {
+        showToast('System request failure: ' + e.message, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = oldText;
+    }
+}
+
+async function handleEmailLogin(event) {
+    event.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const btn = document.getElementById('btn-login-submit');
+
+    btn.disabled = true;
+    const oldText = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...`;
+
+    try {
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            showToast('Welcome back, Ninja!', 'success');
+            onLoginSuccess(data.user);
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Invalid credentials or access deactivated', 'error');
+        }
+    } catch (e) {
+        showToast('Login request error: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldText;
+    }
+}
+
+async function handleLogout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        showToast('You have signed out gracefully.', 'success');
+        checkAuthentication();
+    } catch (e) {
+        showToast('Error during logout: ' + e.message, 'error');
+    }
+}
+
+// ----------------- WHITELIST MANAGEMENT FLOW -----------------
+function toggleAddUserModal() {
+    const modal = document.getElementById('add-user-modal');
+    modal.style.display = modal.style.display === 'none' || !modal.style.display ? 'flex' : 'none';
+    if (modal.style.display === 'flex') {
+        document.getElementById('add-user-form').reset();
+    }
+}
+
+function openAddUserModal() {
+    toggleAddUserModal();
+}
+
+async function handleAddUserSubmit(event) {
+    event.preventDefault();
+    const email = document.getElementById('new-user-email').value.trim();
+    const role = document.getElementById('new-user-role').value;
+    const password = document.getElementById('new-user-password').value;
+
+    try {
+        const res = await fetch('/api/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, role, password: password || null })
+        });
+
+        if (res.ok) {
+            showToast('User whitelisted successfully!', 'success');
+            toggleAddUserModal();
+            loadUsersList();
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Failed to add user', 'error');
+        }
+    } catch (e) {
+        showToast('Error adding user: ' + e.message, 'error');
+    }
+}
+
+async function loadUsersList() {
+    const tbody = document.getElementById('whitelist-users-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading whitelist records...</td></tr>`;
+
+    try {
+        const res = await fetch('/api/users');
+        if (res.ok) {
+            const users = await res.json();
+            if (users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No users whitelisted yet.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = users.map(u => {
+                const label = u.role === 'super_admin' ? '<span class="status-badge" style="background:#8e44ad; color:white; padding:2px 6px; border-radius:3px; font-weight:600;">Super Admin</span>' : '<span class="status-badge" style="background:#5e72e4; color:white; padding:2px 6px; border-radius:3px; font-weight:600;">Reviewer</span>';
+                const statusChecked = u.is_allowed ? 'checked' : '';
+                const isSuperAdminEmail = u.email === 'namankshetri2@gmail.com';
+                const toggleDisabled = isSuperAdminEmail ? 'disabled' : '';
+                const deleteDisabled = isSuperAdminEmail ? 'display:none;' : 'display:inline-block;';
+
+                return `<tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 12px; font-weight:600; color:var(--text-main);">${escapeHtml(u.email)}</td>
+                    <td style="padding: 12px;">${label}</td>
+                    <td style="padding: 12px; color:var(--text-muted);">${new Date(u.created_at).toLocaleString()}</td>
+                    <td style="padding: 12px;">
+                        <label class="switch" style="position:relative; display:inline-block; width:44px; height:22px; vertical-align:middle;">
+                            <input type="checkbox" ${statusChecked} ${toggleDisabled} onchange="toggleUserAccess('${u.email}', this.checked)" style="opacity:0; width:0; height:0;">
+                            <span class="slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px;"></span>
+                        </label>
+                    </td>
+                    <td style="padding: 12px; text-align:right;">
+                        <button onclick="deleteUserWhitelist('${u.email}')" class="secondary-btn btn-sm" style="color:#e74c3c; border-color:#f5b7b1; ${deleteDisabled}">
+                            <i class="fa-solid fa-trash"></i> Delete
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } else {
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:#e74c3c;">Failed to load whitelisted users.</td></tr>`;
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:#e74c3c;">Connection error: ${e.message}</td></tr>`;
+    }
+}
+
+async function toggleUserAccess(email, isAllowed) {
+    try {
+        const res = await fetch(`/api/users/${encodeURIComponent(email)}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_allowed: isAllowed })
+        });
+        if (res.ok) {
+            showToast(`Access status updated for ${email}`, 'success');
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Failed to update access', 'error');
+            loadUsersList();
+        }
+    } catch (e) {
+        showToast('Connection error: ' + e.message, 'error');
+        loadUsersList();
+    }
+}
+
+async function deleteUserWhitelist(email) {
+    if (!confirm(`Are you sure you want to remove access and delete whitelisted email: ${email}?`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`/api/users/${encodeURIComponent(email)}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            showToast(`Successfully deleted ${email}`, 'success');
+            loadUsersList();
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Failed to delete user', 'error');
+        }
+    } catch (e) {
+        showToast('Connection error: ' + e.message, 'error');
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Bind to window context mapping for template/inline HTML call accessibility
+window.checkAuthentication = checkAuthentication;
+window.handleGoogleLoginResponse = handleGoogleLoginResponse;
+window.handleEmailLogin = handleEmailLogin;
+window.handleLogout = handleLogout;
+window.toggleAddUserModal = toggleAddUserModal;
+window.openAddUserModal = openAddUserModal;
+window.handleAddUserSubmit = handleAddUserSubmit;
+window.toggleUserAccess = toggleUserAccess;
+window.deleteUserWhitelist = deleteUserWhitelist;
+

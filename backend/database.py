@@ -125,9 +125,49 @@ def init_db():
         UNIQUE(entry_type, original_val)
     )
     """)
+
+    # Users Table for credentials / Google Authentication whitelist
+    run_ddl("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE,
+        role TEXT,
+        password_hash TEXT,
+        is_allowed INTEGER DEFAULT 1,
+        created_at TEXT
+    )
+    """)
     
+    # Ensure super admin exists
+    try:
+        q_check = "SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER(?)"
+        q_insert = """
+            INSERT INTO users (email, role, password_hash, is_allowed, created_at)
+            VALUES (?, ?, ?, 1, ?)
+        """
+        if is_postgres:
+            q_check = q_check.replace("?", "%s")
+            q_insert = q_insert.replace("?", "%s")
+
+        cursor.execute(q_check, ("namankshetri2@gmail.com",))
+        cnt = cursor.fetchone()[0]
+        if cnt == 0:
+            import hashlib
+            # Hash password 2011@Naman with static seed representation
+            salt = "superadminsalt"
+            pwd_bytes = "2011@Naman".encode('utf-8')
+            salt_bytes = salt.encode('utf-8')
+            h = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt_bytes, 100000)
+            hash_str = f"{salt}:{h.hex()}"
+            
+            cursor.execute(q_insert, ("namankshetri2@gmail.com", "super_admin", hash_str, datetime.datetime.utcnow().isoformat()))
+            print("[Database] Super admin 'namankshetri2@gmail.com' successfully seeded!")
+    except Exception as e:
+        print(f"Error seeding user: {e}")
+
     conn.commit()
     conn.close()
+
 
 def execute_query(query: str, params: tuple = (), commit: bool = False) -> List[tuple]:
     conn = get_db_connection()
@@ -368,3 +408,70 @@ def get_learned_corrections(entry_type: str) -> Dict[str, str]:
     except Exception as e:
         print(f"Error reading learning memory: {e}")
     return corrections
+
+
+def hash_password(password: str) -> str:
+    import hashlib
+    import os
+    salt = os.urandom(16).hex()
+    pwd_bytes = password.encode('utf-8')
+    salt_bytes = salt.encode('utf-8')
+    h = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt_bytes, 100000)
+    return f"{salt}:{h.hex()}"
+
+
+def verify_password(password: str, hashed_str: str) -> bool:
+    try:
+        if not hashed_str or ":" not in hashed_str:
+            return False
+        import hashlib
+        salt, expected_hash_hex = hashed_str.split(":", 1)
+        pwd_bytes = password.encode('utf-8')
+        salt_bytes = salt.encode('utf-8')
+        h = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt_bytes, 100000)
+        return h.hex() == expected_hash_hex
+    except Exception:
+        return False
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    rows = execute_query("SELECT id, email, role, password_hash, is_allowed, created_at FROM users WHERE LOWER(email) = LOWER(?)", (email.strip(),))
+    if rows:
+        r = rows[0]
+        return {
+            "id": r[0],
+            "email": r[1],
+            "role": r[2],
+            "password_hash": r[3],
+            "is_allowed": bool(r[4]),
+            "created_at": r[5]
+        }
+    return None
+
+
+def create_user(email: str, role: str, raw_password: Optional[str] = None):
+    pwd_hash = hash_password(raw_password) if raw_password else None
+    execute_query("""
+        INSERT INTO users (email, role, password_hash, is_allowed, created_at)
+        VALUES (?, ?, ?, 1, ?)
+    """, (email.strip(), role.strip(), pwd_hash, datetime.datetime.utcnow().isoformat()), commit=True)
+
+
+def get_all_users() -> List[Dict[str, Any]]:
+    rows = execute_query("SELECT id, email, role, is_allowed, created_at FROM users ORDER BY created_at DESC")
+    return [{
+        "id": r[0],
+        "email": r[1],
+        "role": r[2],
+        "is_allowed": bool(r[3]),
+        "created_at": r[4]
+    } for r in rows]
+
+
+def delete_user(email: str):
+    execute_query("DELETE FROM users WHERE LOWER(email) = LOWER(?) AND LOWER(email) != 'namankshetri2@gmail.com'", (email.strip().lower(),), commit=True)
+
+
+def update_user_allowed(email: str, is_allowed: bool):
+    execute_query("UPDATE users SET is_allowed = ? WHERE LOWER(email) = LOWER(?)", (int(is_allowed), email.strip()), commit=True)
+

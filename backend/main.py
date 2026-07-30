@@ -75,6 +75,215 @@ def startup_event():
     # Initialize SQLite database schema
     init_db()
 
+
+import hmac
+import hashlib
+import json
+import base64
+import time
+from fastapi.security import APIKeyCookie
+from fastapi import Security, Depends, HTTPException
+
+SECRET_KEY = os.getenv("AUTH_SECRET_KEY", "super-secret-ninja-key-12345")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
+session_cookie = APIKeyCookie(name="session_token", auto_error=False)
+
+def sign_token(payload: dict) -> str:
+    payload_str = json.dumps(payload)
+    payload_b64 = base64.urlsafe_b64encode(payload_str.encode('utf-8')).decode('utf-8')
+    sig = hmac.new(SECRET_KEY.encode('utf-8'), payload_b64.encode('utf-8'), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
+
+def verify_token(token: str) -> Optional[dict]:
+    try:
+        if not token or "." not in token:
+            return None
+        payload_b64, sig = token.split(".", 1)
+        expected_sig = hmac.new(SECRET_KEY.encode('utf-8'), payload_b64.encode('utf-8'), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        payload_str = base64.urlsafe_b64decode(payload_b64.encode('utf-8')).decode('utf-8')
+        payload = json.loads(payload_str)
+        if "exp" in payload and payload["exp"] < time.time():
+            return None
+        return payload
+    except Exception:
+        return None
+
+def get_current_user(token: Optional[str] = Depends(session_cookie)):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication session cookie required.")
+    
+    payload = verify_token(token)
+    if not payload or "email" not in payload:
+        raise HTTPException(status_code=401, detail="Session expired or invalid token")
+        
+    email = payload["email"]
+    if email.lower() == "namankshetri2@gmail.com":
+        return {"email": "namankshetri2@gmail.com", "role": "super_admin", "is_allowed": True}
+        
+    from database import get_user_by_email
+    user = get_user_by_email(email)
+    if not user or not user["is_allowed"]:
+        raise HTTPException(status_code=403, detail="User account deactivated or access revoked")
+        
+    return user
+
+def get_super_admin(current_user=Depends(get_current_user)):
+    if current_user["role"] != "super_admin":
+        raise HTTPException(status_code=403, detail="Super-admin access required")
+    return current_user
+
+# Auth endpoints
+@app.get("/api/auth/config")
+def get_auth_config():
+    return {
+        "google_client_id": GOOGLE_CLIENT_ID
+    }
+
+@app.post("/api/auth/login")
+def login(payload: Dict[str, Any] = Body(...)):
+    email = payload.get("email", "").strip().lower()
+    password = payload.get("password", "")
+    
+    if not email or not password:
+        return JSONResponse(status_code=400, content={"error": "Email and password are required"})
+        
+    if email == "namankshetri2@gmail.com" and password == "2011@Naman":
+        user_info = {"email": "namankshetri2@gmail.com", "role": "super_admin"}
+    else:
+        from database import get_user_by_email, verify_password
+        user = get_user_by_email(email)
+        if not user:
+            return JSONResponse(status_code=401, content={"error": "Invalid email or password"})
+        if not user["is_allowed"]:
+            return JSONResponse(status_code=403, content={"error": "Access deactivated by Administrator"})
+        if not user["password_hash"] or not verify_password(password, user["password_hash"]):
+            return JSONResponse(status_code=401, content={"error": "Invalid email or password"})
+        user_info = {"email": user["email"], "role": user["role"]}
+        
+    token_payload = {
+        "email": user_info["email"],
+        "role": user_info["role"],
+        "exp": time.time() + 86400 * 7
+    }
+    token = sign_token(token_payload)
+    
+    response = JSONResponse(content={"status": "success", "user": user_info, "token": token})
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        max_age=86400 * 7,
+        samesite="lax",
+        secure=False
+    )
+    return response
+
+@app.post("/api/auth/google")
+def google_auth(payload: Dict[str, Any] = Body(...)):
+    credential = payload.get("credential")
+    if not credential:
+        return JSONResponse(status_code=400, content={"error": "Missing Google credential token"})
+        
+    try:
+        r = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={credential}", timeout=5)
+        if r.status_code != 200:
+            return JSONResponse(status_code=401, content={"error": "Invalid Google token (Google API call failed)"})
+            
+        token_info = r.json()
+        email = token_info.get("email", "").strip().lower()
+        email_verified = token_info.get("email_verified")
+        
+        if str(email_verified).lower() not in ("true", "1"):
+            return JSONResponse(status_code=401, content={"error": "Google email not verified"})
+            
+        if email == "namankshetri2@gmail.com":
+            user_info = {"email": "namankshetri2@gmail.com", "role": "super_admin"}
+        else:
+            from database import get_user_by_email
+            user = get_user_by_email(email)
+            if not user:
+                return JSONResponse(status_code=403, content={"error": f"Access denied. '{email}' is not white-listed. Please contact namankshetri2@gmail.com"})
+            if not user["is_allowed"]:
+                return JSONResponse(status_code=403, content={"error": "Access deactivated by Administrator"})
+            user_info = {"email": user["email"], "role": user["role"]}
+            
+        token_payload = {
+            "email": user_info["email"],
+            "role": user_info["role"],
+            "exp": time.time() + 86400 * 7
+        }
+        token = sign_token(token_payload)
+        
+        response = JSONResponse(content={"status": "success", "user": user_info, "token": token})
+        response.set_cookie(
+            key="session_token",
+            value=token,
+            httponly=True,
+            max_age=86400 * 7,
+            samesite="lax",
+            secure=False
+        )
+        return response
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Error authenticating with Google: {str(e)}"})
+
+@app.post("/api/auth/logout")
+def logout():
+    response = JSONResponse(content={"status": "success"})
+    response.delete_cookie("session_token")
+    return response
+
+@app.get("/api/auth/me")
+def get_current_user_profile(user=Depends(get_current_user)):
+    return {"email": user["email"], "role": user["role"]}
+
+# Whitelist Account Management endpoints
+@app.get("/api/users")
+def get_users_list(admin=Depends(get_super_admin)):
+    from database import get_all_users
+    return get_all_users()
+
+@app.post("/api/users")
+def add_new_user(payload: Dict[str, Any] = Body(...), admin=Depends(get_super_admin)):
+    email = payload.get("email", "").strip().lower()
+    role = payload.get("role", "user").strip()
+    password = payload.get("password")
+    
+    if not email:
+        return JSONResponse(status_code=400, content={"error": "Email is required"})
+        
+    from database import get_user_by_email, create_user
+    existing = get_user_by_email(email)
+    if existing:
+        return JSONResponse(status_code=400, content={"error": "User with this email already exists"})
+        
+    create_user(email, role, password)
+    return {"status": "success", "message": "User registered successfully"}
+
+@app.post("/api/users/{email}/toggle")
+def toggle_user_permission(email: str, payload: Dict[str, Any] = Body(...), admin=Depends(get_super_admin)):
+    is_allowed = payload.get("is_allowed", True)
+    if email.lower() == "namankshetri2@gmail.com":
+        return JSONResponse(status_code=400, content={"error": "Cannot deactivate the super admin"})
+        
+    from database import update_user_allowed
+    update_user_allowed(email, is_allowed)
+    return {"status": "success", "message": "User permission updated"}
+
+@app.delete("/api/users/{email}")
+def delete_user_account(email: str, admin=Depends(get_super_admin)):
+    if email.lower() == "namankshetri2@gmail.com":
+        return JSONResponse(status_code=400, content={"error": "Cannot delete the super admin"})
+        
+    from database import delete_user
+    delete_user(email)
+    return {"status": "success", "message": "User deleted successfully"}
+
+
 # Legacy direct endpoint (kept for compatibility)
 @app.post("/extract-menu")
 async def extract_menu(
@@ -127,11 +336,11 @@ async def extract_menu(
 # ----------------- DRAFT / REVIEW FLOW PRODUCTION API -----------------
 
 @app.get("/api/drafts")
-def list_drafts():
+def list_drafts(user=Depends(get_current_user)):
     return get_all_drafts()
 
 @app.get("/api/drafts/{draft_id}")
-def get_draft_details(draft_id: str):
+def get_draft_details(draft_id: str, user=Depends(get_current_user)):
     draft = get_draft(draft_id)
     if not draft:
         return JSONResponse(status_code=404, content={"error": "Draft not found"})
@@ -159,7 +368,8 @@ async def create_new_draft(
     default_dietary: str = Form(""),
     direct_approve: bool = Form(False),
     extraction_engine: str = Form("auto"),
-    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key")
+    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key"),
+    user=Depends(get_current_user)
 ):
     # Save template
     run_id = uuid.uuid4().hex[:10]
@@ -494,7 +704,7 @@ async def create_new_draft(
     return {"status": "success", "draftId": draft_id}
 
 @app.put("/api/drafts/{draft_id}")
-def update_draft(draft_id: str, data: Dict[str, Any] = Body(...)):
+def update_draft(draft_id: str, data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     draft = get_draft(draft_id)
     if not draft:
         return JSONResponse(status_code=404, content={"error": "Draft not found"})
@@ -512,25 +722,26 @@ def update_draft(draft_id: str, data: Dict[str, Any] = Body(...)):
     # Update item list
     incoming_items = data.get("items", [])
     for it in incoming_items:
-        update_draft_item(draft_id, it["id"], it, user="Human Reviewer")
+        update_draft_item(draft_id, it["id"], it, user=user.get("email", "Human Reviewer"))
         
-    log_audit(draft_id, "UPDATE_DRAFT", "Draft changes and review steps saved.")
+    log_audit(draft_id, "UPDATE_DRAFT", "Draft changes and review steps saved.", user=user.get("email", "Human Reviewer"))
     return {"status": "success"}
 
 @app.delete("/api/drafts/{draft_id}")
-def delete_draft_api(draft_id: str):
+def delete_draft_api(draft_id: str, user=Depends(get_current_user)):
     delete_draft(draft_id)
     return {"status": "success"}
 
 @app.get("/api/drafts/{draft_id}/audit")
-def get_audit_trail(draft_id: str):
+def get_audit_trail(draft_id: str, user=Depends(get_current_user)):
     return get_audit_logs(draft_id)
 
 @app.post("/api/drafts/{draft_id}/generate-descriptions")
 def generate_batch_descriptions(
     draft_id: str, 
     payload: Dict[str, Any] = Body(...),
-    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key")
+    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key"),
+    user=Depends(get_current_user)
 ):
     item_ids = payload.get("itemIds", [])
     if not item_ids:
@@ -585,7 +796,7 @@ def generate_batch_descriptions(
     return {"status": "success", "updated": updated_count}
 
 @app.post("/api/drafts/{draft_id}/approve")
-def approve_and_export_menu(draft_id: str, payload: Dict[str, Any] = Body(...)):
+def approve_and_export_menu(draft_id: str, payload: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     approved_agreement = payload.get("approvedAgreement", False)
     if not approved_agreement:
         return JSONResponse(status_code=400, content={"error": "Final approval agreement checkbox must be checked."})
@@ -683,7 +894,7 @@ def approve_and_export_menu(draft_id: str, payload: Dict[str, Any] = Body(...)):
     }
 
 @app.get("/api/diagnostics")
-def get_diagnostics():
+def get_diagnostics(admin=Depends(get_super_admin)):
     from verify_pipeline import run_diagnostics
     report = run_diagnostics(verbose=False)
     return report
@@ -700,7 +911,7 @@ def get_health():
     }
 
 @app.get("/download/{filename}")
-def download_file(filename: str):
+def download_file(filename: str, user=Depends(get_current_user)):
     file_path = OUTPUT_DIR / filename
     if not file_path.exists():
         return JSONResponse(status_code=404, content={"error": "File not found"})
