@@ -2132,11 +2132,11 @@ input:checked+.slider:before {
 .settings-card {
     max-width: 450px;
     width: 90%;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
     border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 8px 32px var(--shadow-color);
+    box-shadow: 0 8px 32px rgba(90, 115, 62, 0.08);
 }
 
 .settings-header {
@@ -2179,11 +2179,11 @@ input:checked+.slider:before {
 
 .settings-input {
     width: 100%;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border-glass);
     border-radius: 8px;
     padding: 10px 12px;
-    background-color: var(--body-bg);
-    color: var(--text-main);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     font-family: inherit;
     font-size: 14px;
     outline: none;
@@ -2223,7 +2223,7 @@ input:checked+.slider:before {
 
 .whitelist-table-hdr {
     text-align: left;
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border-glass);
 }
 
 .whitelist-table-cell {
@@ -2234,7 +2234,7 @@ input:checked+.slider:before {
 .whitelist-table-cell-bold {
     padding: 12px;
     font-weight: 700;
-    color: var(--text-main);
+    color: var(--text-primary);
 }
 
 .whitelist-table-cell-muted {
@@ -2261,7 +2261,7 @@ input:checked+.slider:before {
 }
 
 .whitelist-row {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-glass);
 }
 
 /* User dynamic role badges */
@@ -2293,12 +2293,12 @@ input:checked+.slider:before {
     gap: 4px;
 }
 
-/* Whitelist switch toggles */
+/* Whitelist switch toggles - Bulletproof Modern Toggle */
 .whitelist-switch-label {
     position: relative;
     display: inline-block;
-    width: 44px;
-    height: 22px;
+    width: 50px;
+    height: 26px;
     vertical-align: middle;
 }
 
@@ -2306,6 +2306,7 @@ input:checked+.slider:before {
     opacity: 0;
     width: 0;
     height: 0;
+    position: absolute;
 }
 
 .whitelist-switch-slider {
@@ -2316,29 +2317,37 @@ input:checked+.slider:before {
     right: 0;
     bottom: 0;
     background-color: #cbd5e1;
-    transition: .3s;
-    border-radius: 34px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    border-radius: 30px;
 }
 
 .whitelist-switch-slider:before {
     position: absolute;
     content: "";
-    height: 16px;
-    width: 16px;
-    left: 3px;
-    bottom: 3px;
+    height: 20px;
+    width: 20px;
+    left: 2px;
+    bottom: 2px;
     background-color: white;
-    transition: .3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
 }
 
 .whitelist-switch-input:checked+.whitelist-switch-slider {
-    background-color: var(--accent-color);
+    background-color: var(--primary);
+    border-color: var(--primary);
 }
 
 .whitelist-switch-input:checked+.whitelist-switch-slider:before {
-    transform: translateX(22px);
+    transform: translateX(24px);
+}
+
+.whitelist-switch-input:disabled+.whitelist-switch-slider {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background-color: rgba(0, 0, 0, 0.08);
 }
 
 .whitelist-btn-delete {
