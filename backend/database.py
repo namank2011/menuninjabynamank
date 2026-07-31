@@ -185,8 +185,12 @@ def init_db():
     conn.close()
 
 
-def execute_query(query: str, params: tuple = (), commit: bool = False) -> List[tuple]:
-    conn = get_db_connection()
+def execute_query(query: str, params: tuple = (), commit: bool = False, conn = None) -> List[tuple]:
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+        
     is_postgres = False
     try:
         is_postgres = "psycopg2" in str(type(conn))
@@ -201,31 +205,35 @@ def execute_query(query: str, params: tuple = (), commit: bool = False) -> List[
     result = []
     if not commit:
         result = cursor.fetchall()
-    else:
+    elif should_close:
         conn.commit()
-    conn.close()
+            
+    if should_close:
+        conn.close()
     return result
 
-def create_draft(business_name: str, defaults: Dict[str, Any], files: List[Dict[str, Any]], created_by: str = "namankshetri2@gmail.com") -> str:
+def create_draft(business_name: str, defaults: Dict[str, Any], files: List[Dict[str, Any]], created_by: str = "namankshetri2@gmail.com", conn = None) -> str:
     draft_id = uuid.uuid4().hex[:12]
     now = datetime.datetime.now().isoformat()
     execute_query(
         "INSERT INTO drafts (id, business_name, created_at, updated_at, defaults, files, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (draft_id, business_name, now, now, json.dumps(defaults), json.dumps(files), "Draft", created_by),
-        commit=True
+        commit=True,
+        conn=conn
     )
-    log_audit(draft_id, "CREATE_DRAFT", f"Draft created for {business_name}", user=created_by)
+    log_audit(draft_id, "CREATE_DRAFT", f"Draft created for {business_name}", user=created_by, conn=conn)
     return draft_id
 
-def log_audit(draft_id: str, action: str, details: str, user: str = "Human Reviewer"):
+def log_audit(draft_id: str, action: str, details: str, user: str = "Human Reviewer", conn = None):
     now = datetime.datetime.now().isoformat()
     execute_query(
         'INSERT INTO audit_logs (draft_id, timestamp, action, details, "user") VALUES (?, ?, ?, ?, ?)',
         (draft_id, now, action, details, user),
-        commit=True
+        commit=True,
+        conn=conn
     )
 
-def add_draft_item(draft_id: str, item: Dict[str, Any]) -> str:
+def add_draft_item(draft_id: str, item: Dict[str, Any], conn = None) -> str:
     item_id = item.get("id") or uuid.uuid4().hex[:12]
     execute_query("""
         INSERT INTO draft_items (
@@ -258,12 +266,12 @@ def add_draft_item(draft_id: str, item: Dict[str, Any]) -> str:
         item.get("taxValue", 5.0) if item.get("taxValue") is not None else 5.0,
         item.get("reviewStatus", "Not Reviewed"),
         1 if item.get("approved") else 0
-    ), commit=True)
+    ), commit=True, conn=conn)
     return item_id
 
-def update_draft_item(draft_id: str, item_id: str, item: Dict[str, Any], user: str = "Human Reviewer"):
+def update_draft_item(draft_id: str, item_id: str, item: Dict[str, Any], user: str = "Human Reviewer", conn = None):
     # Grab the old values for audit logging
-    old_rows = execute_query("SELECT category_name, product_name, variations, review_status, approved FROM draft_items WHERE id = ? AND draft_id = ?", (item_id, draft_id))
+    old_rows = execute_query("SELECT category_name, product_name, variations, review_status, approved FROM draft_items WHERE id = ? AND draft_id = ?", (item_id, draft_id), conn=conn)
     
     execute_query("""
         UPDATE draft_items SET
@@ -295,7 +303,7 @@ def update_draft_item(draft_id: str, item_id: str, item: Dict[str, Any], user: s
         1 if item.get("approved") else 0,
         item_id,
         draft_id
-    ), commit=True)
+    ), commit=True, conn=conn)
     
     # Audit log if changed
     if old_rows:
@@ -316,10 +324,10 @@ def update_draft_item(draft_id: str, item_id: str, item: Dict[str, Any], user: s
             changes.append(f"approved: {bool(old_appr)} -> {bool(new_appr)}")
             
         if changes:
-            log_audit(draft_id, "UPDATE_ITEM", f"Updated product '{new_name}' ({item_id}): " + ", ".join(changes), user)
+            log_audit(draft_id, "UPDATE_ITEM", f"Updated product '{new_name}' ({item_id}): " + ", ".join(changes), user, conn=conn)
 
-def get_draft(draft_id: str) -> Optional[Dict[str, Any]]:
-    rows = execute_query("SELECT id, business_name, created_at, updated_at, defaults, files, status, created_by FROM drafts WHERE id = ?", (draft_id,))
+def get_draft(draft_id: str, conn = None) -> Optional[Dict[str, Any]]:
+    rows = execute_query("SELECT id, business_name, created_at, updated_at, defaults, files, status, created_by FROM drafts WHERE id = ?", (draft_id,), conn=conn)
     if not rows:
         return None
     
@@ -334,7 +342,7 @@ def get_draft(draft_id: str) -> Optional[Dict[str, Any]]:
                item_code, station, preparation_time, image_url_1, image_url_2, image_url_3, 
                tax_category, tax_type, tax_value, review_status, approved
         FROM draft_items WHERE draft_id = ?
-    """, (draft_id,))
+    """, (draft_id,), conn=conn)
     
     items = []
     for r in item_rows:

@@ -68,7 +68,7 @@ def load_validation_lists(template_path: Path) -> Dict[str, List[str]]:
         # Fallback if resolving or mtime fails
         return _cached_load_validation_lists(str(template_path), 0.0)
 
-def validate_item(item: Dict[str, Any], validation_lists: Dict[str, List[str]], all_items: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+def validate_item(item: Dict[str, Any], validation_lists: Dict[str, List[str]], all_items: Any) -> List[Dict[str, str]]:
     errors = []
     
     # 1. Product Name*
@@ -195,14 +195,18 @@ def validate_item(item: Dict[str, Any], validation_lists: Dict[str, List[str]], 
     norm_cat = cat_name.lower().replace(" ", "")
     
     is_duplicate = False
-    for other in all_items:
-        if other.get("id") == item.get("id"):
-            continue
-        other_name = str(other.get("productName", "")).strip().lower().replace(" ", "")
-        other_cat = str(other.get("categoryName", "")).strip().lower().replace(" ", "")
-        if other_name == norm_name and other_cat == norm_cat:
-            is_duplicate = True
-            break
+    if isinstance(all_items, dict):
+        if norm_name and norm_cat:
+            is_duplicate = all_items.get((norm_cat, norm_name), 0) > 1
+    else:
+        for other in all_items:
+            if other.get("id") == item.get("id"):
+                continue
+            other_name = str(other.get("productName", "")).strip().lower().replace(" ", "")
+            other_cat = str(other.get("categoryName", "")).strip().lower().replace(" ", "")
+            if other_name == norm_name and other_cat == norm_cat:
+                is_duplicate = True
+                break
             
     if is_duplicate:
         errors.append({"type": "Warning", "field": "productName", "message": "Possible duplicate product detected in the same category."})
@@ -213,10 +217,19 @@ def validate_menu(items: List[Dict[str, Any]], template_path: Path) -> List[Dict
     validation_lists = load_validation_lists(template_path)
     validated_items = []
     
+    # Pre-calculate counts of (category_name, product_name) for fast O(1) duplicate checks
+    item_counts = {}
+    for item in items:
+        norm_name = str(item.get("productName", "")).strip().lower().replace(" ", "")
+        norm_cat = str(item.get("categoryName", "")).strip().lower().replace(" ", "")
+        if norm_name and norm_cat:
+            key = (norm_cat, norm_name)
+            item_counts[key] = item_counts.get(key, 0) + 1
+            
     for item in items:
         # Clone item and run validation
         item_copy = dict(item)
-        errs = validate_item(item_copy, validation_lists, items)
+        errs = validate_item(item_copy, validation_lists, item_counts)
         item_copy["validationErrors"] = errs
         
         # Set status based on validation errors

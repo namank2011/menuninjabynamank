@@ -419,7 +419,7 @@
                                     <div class="search-box">
                                         <i class="fa-solid fa-magnifying-glass"></i>
                                         <input type="text" id="stage1-search" placeholder="Search item..."
-                                            oninput="renderTableStage1()">
+                                            oninput="renderTableStage1()" autocomplete="off">
                                     </div>
                                     <select id="stage1-filter-cat" onchange="renderTableStage1()"></select>
                                     <select id="stage1-filter-conf" onchange="renderTableStage1()">
@@ -433,6 +433,9 @@
                                             class="fa-solid fa-plus"></i> Add Row</button>
                                     <button class="secondary-btn btn-sm" onclick="bulkApproveItems()"><i
                                             class="fa-solid fa-check-double"></i> Bulk Approve</button>
+                                    <button class="secondary-btn btn-sm" id="btn-bulk-ai-desc"
+                                        onclick="triggerBulkAIDescriptions()"><i class="fa-solid fa-robot"></i> Bulk AI
+                                        Desc</button>
                                 </div>
                             </div>
 

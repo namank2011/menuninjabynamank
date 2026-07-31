@@ -491,6 +491,8 @@ async def create_new_draft(
                 temp_paths.append(comp_path)
                 
             extraction = extract_from_images_with_gemini(temp_paths, api_key=gemini_key)
+            from file_extractors import apply_learned_corrections_to_extraction
+            extraction = apply_learned_corrections_to_extraction(extraction)
             execution_seconds = time.time() - start_time
             time_per_file = round(execution_seconds / len(saved_paths), 2)
             
@@ -649,22 +651,40 @@ async def create_new_draft(
     all_extracted_items = deduped_items
             
     # Save draft inside database with ownership tracking
-    draft_id = create_draft(business_name, defaults_dict, saved_files, created_by=user["email"])
-    
-    # Save template path to metadata
-    defaults_dict["templatePath"] = str(template_path)
-    
-    # Insert items
-    for item in all_extracted_items:
-        add_draft_item(draft_id, item)
+    from database import get_db_connection
+    conn = get_db_connection()
+    try:
+        draft_id = create_draft(business_name, defaults_dict, saved_files, created_by=user["email"], conn=conn)
+        
+        # Save template path to metadata
+        defaults_dict["templatePath"] = str(template_path)
+        
+        # Insert items
+        for item in all_extracted_items:
+            add_draft_item(draft_id, item, conn=conn)
+            
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
         
     # Get validated menu
     draft = get_draft(draft_id)
     validated_items = validate_menu(draft["items"], template_path)
     
     # Update SQLite records with validation statuses
-    for v_item in validated_items:
-        update_draft_item(draft_id, v_item["id"], v_item, user="AI Extractor")
+    conn = get_db_connection()
+    try:
+        for v_item in validated_items:
+            update_draft_item(draft_id, v_item["id"], v_item, user="AI Extractor", conn=conn)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
         
     if direct_approve:
         import re
@@ -673,12 +693,12 @@ async def create_new_draft(
         output_path = OUTPUT_DIR / output_filename
         
         # update draft details status to Approved
-        import sqlite3
-        conn = sqlite3.connect(str(backend_dir.parent / "outputs" / "shopverse_agent.db"))
-        cursor = conn.cursor()
-        cursor.execute("UPDATE drafts SET status = 'Approved' WHERE id = ?", (draft_id,))
-        conn.commit()
-        conn.close()
+        conn = get_db_connection()
+        try:
+            execute_query("UPDATE drafts SET status = 'Approved' WHERE id = ?", (draft_id,), commit=True, conn=conn)
+            conn.commit()
+        finally:
+            conn.close()
         
         # fetch fresh details with final item status
         draft = get_draft(draft_id)
@@ -717,20 +737,32 @@ def update_draft(draft_id: str, data: Dict[str, Any] = Body(...), user=Depends(g
     # Update business defaults or metadata if provided
     new_defaults = data.get("defaults", draft.get("defaults"))
     # Save
-    import sqlite3
-    conn = sqlite3.connect(str(sqlite3.absolute_path if hasattr(sqlite3, 'absolute_path') else backend_dir.parent / "outputs" / "shopverse_agent.db"))
-    cursor = conn.cursor()
-    cursor.execute("UPDATE drafts SET defaults = ?, business_name = ? WHERE id = ?", (json.dumps(new_defaults), data.get("businessName", draft.get("businessName")), draft_id))
-    conn.commit()
-    conn.close()
+    from database import get_db_connection
+    conn = get_db_connection()
+    try:
+        execute_query("UPDATE drafts SET defaults = ?, business_name = ? WHERE id = ?", 
+                      (json.dumps(new_defaults), data.get("businessName", draft.get("businessName")), draft_id), 
+                      commit=True, conn=conn)
 
-    # Update item list
-    incoming_items = data.get("items", [])
-    for it in incoming_items:
-        update_draft_item(draft_id, it["id"], it, user=user.get("email", "Human Reviewer"))
-        
-    log_audit(draft_id, "UPDATE_DRAFT", "Draft changes and review steps saved.", user=user.get("email", "Human Reviewer"))
-    return {"status": "success"}
+        # Update item list
+        incoming_items = data.get("items", [])
+        for it in incoming_items:
+            update_draft_item(draft_id, it["id"], it, user=user.get("email", "Human Reviewer"), conn=conn)
+            
+        log_audit(draft_id, "UPDATE_DRAFT", "Draft changes and review steps saved.", user=user.get("email", "Human Reviewer"), conn=conn)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+    # Return the validated draft details directly so the client doesn't need to perform a separate GET fetch!
+    updated_draft = get_draft(draft_id)
+    items = updated_draft.get("items", [])
+    validated = validate_menu(items, DEFAULT_TEMPLATE)
+    updated_draft["items"] = validated
+    return updated_draft
 
 @app.delete("/api/drafts/{draft_id}")
 def delete_draft_api(draft_id: str, user=Depends(get_current_user)):
@@ -768,47 +800,49 @@ def generate_batch_descriptions(
     if not require_draft_access(draft, user):
         return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
         
+    overwrite = payload.get("overwrite", False)
     updated_count = 0
     for item in draft.get("items", []):
-        if item["id"] in item_ids and not item.get("description"):
-            # Call Gemini/Ollama text model APIs to generate descriptive sentence
-            try:
-                desc_prompt = f"Write a short, delicious, 1-sentence description (maximum 15 words) for the restaurant dish: '{item['productName']}'. Return ONLY the direct description sentence, do not add introductory phrases or quotes."
-                gemini_key = x_gemini_api_key or os.getenv("GEMINI_API_KEY")
-                if gemini_key:
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={gemini_key}"
-                    payload = {
-                        "contents": [{
-                            "parts": [{"text": desc_prompt}]
-                        }]
-                    }
-                    r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
-                    r.raise_for_status()
-                    res_data = r.json()
-                    ai_desc = res_data["candidates"][0]["content"]["parts"][0]["text"].strip().replace('"', '')
-                else:
-                    ollama_payload = {
-                        "model": TEXT_MODEL,
-                        "prompt": desc_prompt,
-                        "stream": False,
-                        "options": {
-                            "temperature": 0.6,
-                            "num_predict": 30
+        if item["id"] in item_ids:
+            if not item.get("description") or overwrite:
+                # Call Gemini/Ollama text model APIs to generate descriptive sentence
+                try:
+                    desc_prompt = f"Write a short, delicious, 1-sentence description (maximum 15 words) for the restaurant dish: '{item['productName']}'. Return ONLY the direct description sentence, do not add introductory phrases or quotes."
+                    gemini_key = x_gemini_api_key or os.getenv("GEMINI_API_KEY")
+                    if gemini_key:
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={gemini_key}"
+                        payload = {
+                            "contents": [{
+                                "parts": [{"text": desc_prompt}]
+                            }]
                         }
-                    }
-                    url = f"{OLLAMA_BASE_URL}/api/generate"
-                    r = requests.post(url, json=ollama_payload, timeout=REQUEST_TIMEOUT_SECONDS)
-                    r.raise_for_status()
-                    ai_desc = r.json().get("response", "").strip().replace('"', '')
-                
-                if ai_desc:
-                    item["description"] = ai_desc
-                    # Mark review status to refresh validation
-                    item["reviewStatus"] = "Review Required" 
-                    update_draft_item(draft_id, item["id"], item, user="AI Description Generator")
-                    updated_count += 1
-            except Exception as err:
-                print(f"Description generation failed: {err}")
+                        r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+                        r.raise_for_status()
+                        res_data = r.json()
+                        ai_desc = res_data["candidates"][0]["content"]["parts"][0]["text"].strip().replace('"', '')
+                    else:
+                        ollama_payload = {
+                            "model": TEXT_MODEL,
+                            "prompt": desc_prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.6,
+                                "num_predict": 30
+                            }
+                        }
+                        url = f"{OLLAMA_BASE_URL}/api/generate"
+                        r = requests.post(url, json=ollama_payload, timeout=REQUEST_TIMEOUT_SECONDS)
+                        r.raise_for_status()
+                        ai_desc = r.json().get("response", "").strip().replace('"', '')
+                    
+                    if ai_desc:
+                        item["description"] = ai_desc
+                        # Mark review status to refresh validation
+                        item["reviewStatus"] = "Review Required" 
+                        update_draft_item(draft_id, item["id"], item, user="AI Description Generator")
+                        updated_count += 1
+                except Exception as err:
+                    print(f"Description generation failed: {err}")
                 
     return {"status": "success", "updated": updated_count}
 

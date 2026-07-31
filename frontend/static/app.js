@@ -39,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initUploadEvents();
     loadSavedSettings();
     checkAuthentication();
+    const searchInput = document.getElementById('stage1-search');
+    if (searchInput) {
+        searchInput.value = '';
+    }
 });
 
 // Switch major views: dashboard, create, review-flow
@@ -48,6 +52,11 @@ function switchView(viewName) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
     document.getElementById(`view-${viewName}`).classList.add('active');
+
+    const searchInput = document.getElementById('stage1-search');
+    if (searchInput) {
+        searchInput.value = '';
+    }
 
     if (viewName === 'dashboard') {
         document.getElementById('btn-dash').classList.add('active');
@@ -1360,6 +1369,73 @@ async function generateSingleDescription() {
     }
 }
 
+async function triggerBulkAIDescriptions() {
+    if (!currentDraft || !currentDraft.items || currentDraft.items.length === 0) {
+        showToast('No items available in this draft.', 'info');
+        return;
+    }
+
+    const op = prompt("Bulk AI Description Generator:\nType 'all' to generate/overwrite descriptions for ALL items.\nType 'empty' to only generate descriptions for items currently missing one.\nLeave blank or click Cancel to abort.");
+    if (!op) return; // Abort if blank or null
+
+    const choice = op.trim().toLowerCase();
+    if (choice !== 'all' && choice !== 'empty') {
+        showToast('Invalid option. Aborted.', 'error');
+        return;
+    }
+
+    const overwrite = (choice === 'all');
+
+    // Get list of item IDs
+    let itemIds = [];
+    if (overwrite) {
+        itemIds = currentDraft.items.map(it => it.id);
+    } else {
+        itemIds = currentDraft.items.filter(it => !it.description).map(it => it.id);
+    }
+
+    if (itemIds.length === 0) {
+        showToast('No items matched the generation criteria.', 'info');
+        return;
+    }
+
+    const btn = document.getElementById('btn-bulk-ai-desc');
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generating ${itemIds.length}...`;
+
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        const apiKey = localStorage.getItem("gemini_api_key");
+        if (apiKey) {
+            headers['X-Gemini-API-Key'] = apiKey;
+        }
+        const response = await fetch(`/api/drafts/${currentDraftId}/generate-descriptions`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ itemIds, overwrite })
+        });
+        const res = await response.json();
+        if (response.ok) {
+            // Re-fetch draft details
+            const root_r = await fetch(`/api/drafts/${currentDraftId}`, { headers });
+            if (root_r.ok) {
+                currentDraft = await root_r.json();
+                renderTableStage1();
+                updateFooterSummary();
+            }
+            showToast(`Successfully generated ${res.updated || 0} descriptions!`, 'success');
+        } else {
+            showToast(res.error || 'Bulk generation failed.', 'error');
+        }
+    } catch (e) {
+        showToast('Network error during description generation: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+    }
+}
+
 // ----------------- CRUD SYNC -----------------
 
 async function saveDraftProgress(silent = false) {
@@ -1382,18 +1458,7 @@ async function saveDraftProgress(silent = false) {
         });
 
         if (response.ok) {
-            // Fetch validated list
-            const headers = {};
-            const apiKey = localStorage.getItem("gemini_api_key");
-            if (apiKey) {
-                headers['X-Gemini-API-Key'] = apiKey;
-            }
-            const r = await fetch(`/api/drafts/${currentDraftId}`, {
-                headers: headers
-            });
-            if (r.ok) {
-                currentDraft = await r.json();
-            }
+            currentDraft = await response.json();
 
             if (!silent) {
                 showToast('Draft progress successfully stored in database!', 'success');
@@ -1453,6 +1518,19 @@ const ALLERGENS = ["Gluten", "Crustacean", "Egg", "Fish", "Nuts", "Peanut", "Soy
 const PORTION_UNITS = ["grams", "kg", "inches", "litre", "ml", "ounces", "pounds", "serves", "slices", "cms", "piece", "scoop"];
 
 function revalidateLocalMenu() {
+    if (!currentDraft || !currentDraft.items) return;
+
+    // Pre-calculate occurrences of each product + category combination
+    const occurrences = {};
+    currentDraft.items.forEach(item => {
+        const pName = String(item.productName || '').trim().toLowerCase().replace(/ /g, '');
+        const cat = String(item.categoryName || '').trim().toLowerCase().replace(/ /g, '');
+        if (pName && cat) {
+            const key = cat + '::' + pName;
+            occurrences[key] = (occurrences[key] || 0) + 1;
+        }
+    });
+
     currentDraft.items.forEach(item => {
         const errors = [];
 
@@ -1520,16 +1598,7 @@ function revalidateLocalMenu() {
         // Duplicate detector
         const normName = productName.toLowerCase().replace(/ /g, '');
         const normCat = category.toLowerCase().replace(/ /g, '');
-        let isDup = false;
-
-        currentDraft.items.forEach(other => {
-            if (other.id === item.id) return;
-            const oName = String(other.productName || '').trim().toLowerCase().replace(/ /g, '');
-            const oCat = String(other.categoryName || '').trim().toLowerCase().replace(/ /g, '');
-            if (oName === normName && oCat === normCat) {
-                isDup = true;
-            }
-        });
+        const isDup = (normName && normCat) ? (occurrences[normCat + '::' + normName] || 0) > 1 : false;
 
         if (isDup) {
             errors.push({ type: "Warning", field: "productName", message: "Possible duplicate product detected in the same category." });
