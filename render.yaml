@@ -15,3 +15,5 @@ services:
         value: "llava:latest"
       - key: OLLAMA_TIMEOUT
         value: "240"
+      - key: DATABASE_URL
+        sync: false
