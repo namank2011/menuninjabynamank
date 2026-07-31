@@ -564,6 +564,7 @@ function updateFooterSummary() {
     // Count invalid items
     let invalidCount = 0;
     let pendingReview = 0;
+    let missingDescCount = 0;
 
     currentDraft.items.forEach(it => {
         const blocking = it.validationErrors ? it.validationErrors.filter(e => e.type === 'Blocking Error') : [];
@@ -573,13 +574,20 @@ function updateFooterSummary() {
         if (!it.approved) {
             pendingReview++;
         }
+        if (!it.description || !it.description.trim()) {
+            missingDescCount++;
+        }
     });
 
     const statusDiv = document.getElementById('wizard-summary-status');
     if (statusDiv) {
+        let descInfo = "";
+        if (missingDescCount > 0) {
+            descInfo = ` | <span style="color: #5e7a46; font-weight:600;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${missingDescCount} items missing descriptions</span> <button onclick="triggerBulkAIDescriptions()" class="secondary-btn btn-sm" style="margin-left: 6px; padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-robot"></i> Fill via AI</button>`;
+        }
         statusDiv.innerHTML = `
             Draft status: <strong class="warning-text">${invalidCount} details block export</strong> | 
-            Unapproved items: <strong>${pendingReview} total</strong>
+            Unapproved items: <strong>${pendingReview} total</strong>${descInfo}
         `;
     }
 
@@ -1325,10 +1333,12 @@ async function generateSingleDescription() {
     const activeItem = currentDraft.items.find(it => it.id === selectedItemId);
     if (!activeItem) return;
 
+    let overwrite = false;
     if (activeItem.description) {
         if (!confirm('This item already has a description. Do you want to overwrite it with AI generated description?')) {
             return;
         }
+        overwrite = true;
     }
 
     const triggerBtn = document.querySelector('#source-viewer-active button');
@@ -1344,7 +1354,7 @@ async function generateSingleDescription() {
         const response = await fetch(`/api/drafts/${currentDraftId}/generate-descriptions`, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ itemIds: [selectedItemId] })
+            body: JSON.stringify({ itemIds: [selectedItemId], overwrite: overwrite })
         });
 
         const res = await response.json();
