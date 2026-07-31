@@ -48,6 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Switch major views: dashboard, create, review-flow
 function switchView(viewName) {
     currentView = viewName;
+    localStorage.setItem('menu_ninja_view', viewName);
+
     document.querySelectorAll('.content-view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
@@ -64,17 +66,27 @@ function switchView(viewName) {
         document.getElementById('audit-log-toggle').style.display = 'none';
         currentDraftId = null;
         currentDraft = null;
+        localStorage.removeItem('menu_ninja_draft_id');
+        localStorage.removeItem('menu_ninja_step');
         loadDraftsList();
     } else if (viewName === 'create') {
         document.getElementById('btn-create').classList.add('active');
         document.getElementById('save-draft-btn').style.display = 'none';
         document.getElementById('audit-log-toggle').style.display = 'none';
+        currentDraftId = null;
+        currentDraft = null;
+        localStorage.removeItem('menu_ninja_draft_id');
+        localStorage.removeItem('menu_ninja_step');
         clearUploadForm();
     } else if (viewName === 'users') {
         const usersBtn = document.getElementById('btn-users');
         if (usersBtn) usersBtn.classList.add('active');
         document.getElementById('save-draft-btn').style.display = 'none';
         document.getElementById('audit-log-toggle').style.display = 'none';
+        currentDraftId = null;
+        currentDraft = null;
+        localStorage.removeItem('menu_ninja_draft_id');
+        localStorage.removeItem('menu_ninja_step');
         loadUsersList();
     } else if (viewName === 'review-flow') {
         document.getElementById('save-draft-btn').style.display = 'inline-flex';
@@ -322,6 +334,7 @@ async function triggerExtraction(directApprove = false) {
 
 async function loadDraft(draftId) {
     currentDraftId = draftId;
+    localStorage.setItem('menu_ninja_draft_id', draftId);
     switchView('review-flow');
 
     // Reset wizard displays if coming from direct export success layout
@@ -458,6 +471,7 @@ async function deleteDraftApi(id) {
 
 function goToStep(stepNum) {
     currentStep = stepNum;
+    localStorage.setItem('menu_ninja_step', stepNum);
 
     // Manage stepper bar
     document.querySelectorAll('.step-indicator').forEach(ind => {
@@ -1722,6 +1736,14 @@ async function checkAuthentication() {
     }
 }
 
+function hideGlobalLoader() {
+    const loader = document.getElementById('app-loading-overlay');
+    if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.style.display = 'none', 300);
+    }
+}
+
 function onLoginSuccess(user, googleClientId) {
     currentUser = user;
 
@@ -1741,7 +1763,30 @@ function onLoginSuccess(user, googleClientId) {
     const settingsBtn = document.getElementById('btn-settings');
     if (settingsBtn) settingsBtn.style.display = isAdmin ? 'flex' : 'none';
 
-    loadDraftsList();
+    // Restore previous state if available
+    const savedView = localStorage.getItem('menu_ninja_view');
+    const savedDraftId = localStorage.getItem('menu_ninja_draft_id');
+    const savedStep = localStorage.getItem('menu_ninja_step');
+
+    if (savedView === 'review-flow' && savedDraftId) {
+        loadDraft(savedDraftId).then(() => {
+            if (savedStep) {
+                goToStep(parseInt(savedStep));
+            }
+            hideGlobalLoader();
+        }).catch(err => {
+            console.error("Failed restoring draft progress view:", err);
+            switchView('dashboard');
+            hideGlobalLoader();
+        });
+    } else {
+        if (savedView && savedView !== 'review-flow') {
+            switchView(savedView);
+        } else {
+            switchView('dashboard');
+        }
+        hideGlobalLoader();
+    }
 }
 
 function onLoginRequired(googleClientId) {
@@ -1750,6 +1795,7 @@ function onLoginRequired(googleClientId) {
     document.querySelector('.app-container').style.display = 'none';
 
     initGoogleAuth(googleClientId);
+    hideGlobalLoader();
 }
 
 function initGoogleAuth(clientId) {
@@ -1858,6 +1904,9 @@ async function handleLogout() {
     try {
         await fetch('/api/auth/logout', { method: 'POST' });
         localStorage.removeItem('session_token');
+        localStorage.removeItem('menu_ninja_view');
+        localStorage.removeItem('menu_ninja_draft_id');
+        localStorage.removeItem('menu_ninja_step');
         showToast('You have signed out gracefully.', 'success');
         checkAuthentication();
     } catch (e) {

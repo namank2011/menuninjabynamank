@@ -20,8 +20,17 @@
 
 <body class="light-mode">
 
+    <!-- Global App Loader -->
+    <div id="app-loading-overlay"
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #fdfdfa; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999; transition: opacity 0.3s ease;">
+        <i class="fa-solid fa-user-ninja fa-spin" style="font-size: 3rem; color: #6b8e23; margin-bottom: 1.5rem;"></i>
+        <h2 style="font-family: 'Inter', sans-serif; color: #4a5d23; font-weight: 600; margin: 0;">Menu Ninja</h2>
+        <span style="font-family: 'Inter', sans-serif; color: #8a9c63; font-size: 0.85rem; margin-top: 0.5rem;">Resuming
+            security session...</span>
+    </div>
+
     <!-- Login View (Glassmorphic authentication overlay) -->
-    <div id="login-container">
+    <div id="login-container" style="display: none;">
         <div class="login-card glassmorphic">
             <div id="login-logo" class="login-logo-container">
                 <i class="fa-solid fa-user-ninja login-logo-icon"></i>
