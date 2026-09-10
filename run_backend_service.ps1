@@ -1,4 +1,4 @@
-# Load env
+new changes# Load env
 if (Test-Path .env) {
     Get-Content .env | Where-Object { $_ -and -not $_.StartsWith("#") } | ForEach-Object {
         $name, $value = $_.Split('=', 2)
