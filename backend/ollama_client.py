@@ -383,8 +383,8 @@ def extract_from_text_with_ollama(text: str, model: Optional[str] = None, api_ke
         "stream": False,
         "options": {
             "temperature": 0,
-            "num_ctx": 4096,
-            "num_predict": 1000,
+            "num_ctx": 16384,
+            "num_predict": 4096,
         },
     }
     raw = _post_generate(payload)
@@ -437,8 +437,8 @@ def extract_from_image_with_ollama(image_path: str | Path, model: Optional[str] 
         "stream": False,
         "options": {
             "temperature": 0,
-            "num_ctx": 4096,
-            "num_predict": 1000,
+            "num_ctx": 16384,
+            "num_predict": 4096,
         },
     }
     raw = _post_generate(payload)
