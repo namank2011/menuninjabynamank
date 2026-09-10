@@ -1186,8 +1186,48 @@ def apply_learned_corrections_to_extraction(extraction: MenuExtraction) -> MenuE
     return extraction
 
 
+def _ground_text_extraction(extraction: MenuExtraction, source_text: str) -> MenuExtraction:
+    """Drop model rows that have no usable evidence in a text-backed upload."""
+    source_lower = source_text.lower()
+    source_words = set(re.findall(r"[a-z0-9]{3,}", source_lower))
+    grounded_items = []
+    rejected = 0
+
+    for item in extraction.items:
+        name_words = set(re.findall(r"[a-z0-9]{3,}", item.product_name.lower()))
+        name_overlap = len(name_words & source_words)
+        source_overlap = len(set(re.findall(r"[a-z0-9]{3,}", item.source_text.lower())) & source_words)
+        prices = [v.price for v in item.variations if v.price is not None]
+        prices_visible = bool(prices) and all(
+            re.search(rf"(?<!\d){re.escape(str(price).rstrip('0').rstrip('.'))}(?!\d)", source_lower)
+            for price in prices
+        )
+
+        if item.source_text.strip() and source_overlap >= 2 and (name_overlap >= 1 or prices_visible):
+            grounded_items.append(item)
+        else:
+            rejected += 1
+
+    if rejected:
+        extraction.document_notes.append(
+            f"Rejected {rejected} extracted row(s) without matching source text or visible prices."
+        )
+    extraction.items = grounded_items
+    return extraction
+
+
 def extract_menu_from_file(path: str | Path, engine: str = "auto", api_key: Optional[str] = None) -> MenuExtraction:
+    path = Path(path)
     extraction = _extract_menu_from_file_raw(path, engine, api_key)
+    suffix = path.suffix.lower()
+    if suffix in {".txt", ".csv", ".docx", ".doc", ".pdf"}:
+        source_text = extract_plain_text_from_file(path)
+        if source_text.strip():
+            extraction = _ground_text_extraction(extraction, source_text)
+    elif suffix in SUPPORTED_IMAGE_EXTS:
+        ocr_text = extract_text_from_image_via_ocr(path)
+        if ocr_text.strip():
+            extraction = _ground_text_extraction(extraction, ocr_text)
     return apply_learned_corrections_to_extraction(extraction)
 
 

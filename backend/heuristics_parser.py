@@ -9,6 +9,51 @@ def clean_name(name: str) -> str:
     name = re.sub(r'[-\+\.\s\:\,\;\*\/\|]+$', '', name)
     return name.strip()
 
+
+def _parse_structured_menu_export(lines: List[str]) -> Optional[MenuExtraction]:
+    """Parse exports containing explicit FoodCategory and Item records."""
+    if not any(line.lower().startswith("item |") for line in lines):
+        return None
+
+    items: List[MenuItem] = []
+    current_category = "Uncategorized"
+    for line in lines:
+        fields = [field.strip() for field in line.split("|")]
+        record_type = fields[0].lower() if fields else ""
+        if record_type == "foodcategory" and len(fields) > 1:
+            current_category = fields[1] or "Uncategorized"
+            continue
+        if record_type != "item" or len(fields) < 2 or not fields[1]:
+            continue
+
+        product_name = clean_name(fields[1])
+        price = None
+        if len(fields) > 2 and fields[2]:
+            try:
+                price = float(fields[2].replace(",", ""))
+            except ValueError:
+                price = None
+
+        description = fields[3] if len(fields) > 3 else ""
+        items.append(MenuItem(
+            category=current_category,
+            product_name=product_name,
+            description=description,
+            dietary_tag="",
+            confidence=1.0 if price is not None else 0.7,
+            source_text=line,
+            variations=[Variation(name="", price=price, listing_price=price)]
+        ))
+
+    if not items:
+        return None
+    return MenuExtraction(
+        currency="INR",
+        items=items,
+        document_notes=["Parsed structured menu export records; modifiers excluded."]
+    )
+
+
 def parse_menu_text_heuristically(text: str) -> Optional[MenuExtraction]:
     """
     Parses a menu text block into MenuExtraction using sequential rule-based heuristics,
@@ -22,6 +67,10 @@ def parse_menu_text_heuristically(text: str) -> Optional[MenuExtraction]:
     
     if not lines:
         return None
+
+    structured = _parse_structured_menu_export(lines)
+    if structured:
+        return structured
         
     items: List[MenuItem] = []
     current_category = "Uncategorized"

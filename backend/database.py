@@ -455,9 +455,9 @@ def get_draft(draft_id: str, conn = None) -> Optional[Dict[str, Any]]:
 def get_all_drafts(user_email: str = None, user_role: str = None) -> List[Dict[str, Any]]:
     """Return drafts filtered by ownership. Super admins see all; operators see only their own."""
     if user_role == "super_admin" or not user_email:
-        rows = execute_query("SELECT id, business_name, created_at, updated_at, status, created_by FROM drafts ORDER BY updated_at DESC")
+        rows = execute_query("SELECT id, business_name, created_at, updated_at, status, created_by, files FROM drafts ORDER BY updated_at DESC")
     else:
-        rows = execute_query("SELECT id, business_name, created_at, updated_at, status, created_by FROM drafts WHERE LOWER(created_by) = LOWER(?) ORDER BY updated_at DESC", (user_email,))
+        rows = execute_query("SELECT id, business_name, created_at, updated_at, status, created_by, files FROM drafts WHERE LOWER(created_by) = LOWER(?) ORDER BY updated_at DESC", (user_email,))
     
     results = []
     for r in rows:
@@ -467,7 +467,8 @@ def get_all_drafts(user_email: str = None, user_role: str = None) -> List[Dict[s
             "createdAt": r[2],
             "updatedAt": r[3],
             "status": r[4],
-            "createdBy": r[5] if len(r) > 5 else None
+            "createdBy": r[5] if len(r) > 5 else None,
+            "files": json.loads(r[6] or "[]") if len(r) > 6 else []
         })
     return results
 

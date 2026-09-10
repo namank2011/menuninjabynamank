@@ -310,11 +310,11 @@ async function triggerExtraction(directApprove = false) {
 
                 const reportLink = document.getElementById('link-report-download');
                 reportLink.href = res.downloadReviewReportTxtUrl;
-                reportLink.setAttribute('download', res.downloadReviewReportTxtUrl.split('/').pop());
+                reportLink.setAttribute('download', res.reviewReportTxt || 'report.txt');
 
                 const jsonLink = document.getElementById('link-json-download');
                 jsonLink.href = res.downloadReviewReportJsonUrl;
-                jsonLink.setAttribute('download', res.downloadReviewReportJsonUrl.split('/').pop());
+                jsonLink.setAttribute('download', res.reviewReportJson || 'report.json');
 
                 // Programmatic download trigger
                 const link = document.createElement('a');
@@ -435,10 +435,19 @@ async function loadDraftsList() {
         list.forEach(d => {
             const tr = document.createElement('tr');
 
-            const badgeClass = d.status === 'Approved' ? 'status-badge reviewed' : 'status-badge not-reviewed';
-            const actionBtn = d.status === 'Approved'
-                ? `<button class="secondary-btn btn-sm" onclick="loadDraft('${d.id}')"><i class="fa-solid fa-eye"></i> View</button>`
-                : `<button class="primary-btn btn-sm" onclick="loadDraft('${d.id}')"><i class="fa-solid fa-pencil"></i> Resume</button>`;
+            // 3-state status badge: Draft / In Review / Approved
+            let badgeClass, actionBtn;
+            if (d.status === 'Approved') {
+                badgeClass = 'status-badge reviewed';
+                actionBtn = `<button class="secondary-btn btn-sm" onclick="loadDraft('${d.id}')"><i class="fa-solid fa-eye"></i> View</button>`;
+            } else if (d.status === 'In Review') {
+                badgeClass = 'status-badge review-required';
+                actionBtn = `<button class="primary-btn btn-sm" onclick="loadDraft('${d.id}')"><i class="fa-solid fa-pencil"></i> Resume</button>`;
+            } else {
+                // 'Draft' — never opened for review yet
+                badgeClass = 'status-badge not-reviewed';
+                actionBtn = `<button class="primary-btn btn-sm" onclick="loadDraft('${d.id}')"><i class="fa-solid fa-play"></i> Start Review</button>`;
+            }
 
             // Build subtitle with engines/times
             let subTexts = [];
@@ -529,7 +538,7 @@ function goToStep(stepNum) {
         3: "Step 3: Final Validation Certificate & Excel Generation"
     };
     document.getElementById('workspace-title').textContent = titles[currentStep] || "Menu Digitizer Review";
-    document.getElementById('workspace-subtitle').textContent = `Business: ${currentDraft.businessName} (Step ${currentStep} of 3)`;
+    document.getElementById('workspace-subtitle').textContent = currentDraft ? `Business: ${currentDraft.businessName} (Step ${currentStep} of 3)` : `Step ${currentStep} of 3`;
 
     // Redraw stepper-progress-line
     const pct = ((currentStep - 1) / 2) * 100;
@@ -859,6 +868,8 @@ function toggleItemApproval(itemId) {
     revalidateLocalMenu();
     renderTableStage1();
     updateFooterSummary();
+    // Auto-save approval state to server so changes are not lost on refresh
+    saveDraftProgress(true);
 }
 
 function bulkApproveItems() {
@@ -875,6 +886,8 @@ function bulkApproveItems() {
     revalidateLocalMenu();
     renderTableStage1();
     updateFooterSummary();
+    // Auto-save bulk approval to server
+    saveDraftProgress(true);
 }
 
 // ----------------- STAGE 2: FLAGGED RECORD RESOLUTION -----------------

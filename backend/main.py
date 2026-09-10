@@ -459,11 +459,10 @@ async def execute_extraction_pipeline(
     use_gemini_batch = False
     gemini_key = x_gemini_api_key or os.getenv("GEMINI_API_KEY")
     
-    # We can batch together if all files are images and engine supports/favors Gemini
+    # Process images independently so rows cannot be mixed between uploaded files.
     all_images = all(p[1].suffix.lower() in SUPPORTED_IMAGE_EXTS for p in saved_paths)
     if all_images and len(saved_paths) > 1:
-        if extraction_engine == "gemini" or (extraction_engine == "auto" and gemini_key):
-            use_gemini_batch = True
+        use_gemini_batch = False
 
     default_dietary = defaults_dict.get("dietaryTag", "")
     master_status = defaults_dict.get("masterStatus", "Active")
@@ -758,10 +757,18 @@ async def execute_extraction_pipeline(
         # Read the file to Base64 to return
         import base64
         file_b64 = ""
+        report_json_b64 = ""
+        report_txt_b64 = ""
         try:
             if output_path.exists():
                 with open(output_path, "rb") as f:
                     file_b64 = base64.b64encode(f.read()).decode("utf-8")
+            if report_json_path.exists():
+                with open(report_json_path, "rb") as f:
+                    report_json_b64 = base64.b64encode(f.read()).decode("utf-8")
+            if report_txt_path.exists():
+                with open(report_txt_path, "rb") as f:
+                    report_txt_b64 = base64.b64encode(f.read()).decode("utf-8")
         except Exception:
             pass
 
@@ -802,7 +809,10 @@ async def execute_extraction_pipeline(
             "draftId": draft_id,
             "outputFile": output_filename,
             "downloadOutputUrl": f"data:{mime_type};base64,{file_b64}",
-            "downloadReviewReportJsonUrl": f"data:application/json;base64,{base64.b64encode(json.dumps(draft['items']).encode('utf-8')).decode('utf-8')}",
+            "reviewReportJson": report_json_name,
+            "reviewReportTxt": report_txt_name,
+            "downloadReviewReportJsonUrl": f"data:application/json;base64,{report_json_b64}",
+            "downloadReviewReportTxtUrl": f"data:text/plain;base64,{report_txt_b64}",
             "file_content_base64": file_b64,
             "items": draft["items"]
         }
@@ -1037,12 +1047,16 @@ def update_draft(draft_id: str, data: Dict[str, Any] = Body(...), user=Depends(g
         
     # Update business defaults or metadata if provided
     new_defaults = data.get("defaults", draft.get("defaults"))
+    # Determine new status: promote 'Draft' to 'In Review' on first human save
+    current_status = draft.get("status", "Draft")
+    new_status = "In Review" if current_status == "Draft" else current_status
+    now_ts = datetime.datetime.now().isoformat()
     # Save
     from database import get_db_connection
     conn = get_db_connection()
     try:
-        execute_query("UPDATE drafts SET defaults = ?, business_name = ? WHERE id = ?", 
-                      (json.dumps(new_defaults), data.get("businessName", draft.get("businessName")), draft_id), 
+        execute_query("UPDATE drafts SET defaults = ?, business_name = ?, updated_at = ?, status = ? WHERE id = ?", 
+                      (json.dumps(new_defaults), data.get("businessName", draft.get("businessName")), now_ts, new_status, draft_id), 
                       commit=True, conn=conn)
 
         # Update item list by comparing changes
@@ -1155,7 +1169,8 @@ def generate_batch_descriptions(
                     "required": ["descriptions"]
                 }
                 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={gemini_key}"
+                from ollama_client import GEMINI_MODEL
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gemini_key}"
                 post_payload = {
                     "contents": [{
                         "parts": [{"text": prompt}]

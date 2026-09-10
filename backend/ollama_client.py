@@ -22,6 +22,15 @@ TEXT_MODEL = os.getenv("OLLAMA_TEXT_MODEL", "llama3.1:latest")
 VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "llava:latest")
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT", "300"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+GEMINI_FALLBACK_MODELS = [
+    model.strip()
+    for model in os.getenv(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-2.5-flash,gemini-2.5-flash-lite",
+    ).split(",")
+    if model.strip()
+]
 
 SYSTEM_PROMPT = """
 You are a highly skilled, multilingual restaurant menu extraction and layout analysis expert for Menu Ninja POS bulk upload.
@@ -270,7 +279,7 @@ def parse_loose_menu_extraction(parsed: Any) -> MenuExtraction:
             "product_name": str(p_name),
             "description": str(desc),
             "dietary_tag": diet,
-            "confidence": item.get("confidence") or 0.9,
+            "confidence": item.get("confidence") if item.get("confidence") is not None else 0.9,
             "source_text": item.get("source_text") or "",
             "variations": variations
         })
@@ -287,7 +296,7 @@ def _post_to_gemini(url: str, payload: Dict[str, Any], headers: Dict[str, str], 
     import re
     
     # List of models to try in sequence on quota/rate limit/error failures
-    model_rotation = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]
+    model_rotation = list(dict.fromkeys([GEMINI_MODEL, *GEMINI_FALLBACK_MODELS]))
     
     # Extract API key from the url
     key_match = re.search(r"key=([^&]+)", url)
@@ -345,7 +354,7 @@ def extract_from_text_with_ollama(text: str, model: Optional[str] = None, api_ke
     active_key = (api_key or GEMINI_API_KEY) if bypass_to_gemini else None
     prompt_with_mem = _get_prompt_with_memory()
     if active_key:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={active_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
         prompt_text = f"{SYSTEM_PROMPT}\n\n{prompt_with_mem}\n\nINPUT TEXT:\n{text[:50000]}"
         payload = {
             "contents": [{
@@ -390,7 +399,7 @@ def extract_from_image_with_ollama(image_path: str | Path, model: Optional[str] 
     active_key = (api_key or GEMINI_API_KEY) if bypass_to_gemini else None
     prompt_with_mem = _get_prompt_with_memory()
     if active_key:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={active_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
         prompt_text = f"{SYSTEM_PROMPT}\n\n{prompt_with_mem}"
         payload = {
             "contents": [{
@@ -442,7 +451,7 @@ def extract_from_text_with_gemini(text: str, api_key: Optional[str] = None) -> M
     if not active_key:
         raise ValueError("GEMINI_API_KEY is not set in the environment or .env file.")
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={active_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
     prompt_with_mem = _get_prompt_with_memory()
     prompt_text = f"{SYSTEM_PROMPT}\n\n{prompt_with_mem}\n\nINPUT TEXT:\n{text}"
     
@@ -476,7 +485,7 @@ def extract_from_images_with_gemini(image_paths: List[str | Path], api_key: Opti
     if not active_key:
         raise ValueError("GEMINI_API_KEY is not set in the environment or .env file.")
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={active_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
     prompt_with_mem = _get_prompt_with_memory()
     prompt_text = f"{SYSTEM_PROMPT}\n\n{prompt_with_mem}"
     

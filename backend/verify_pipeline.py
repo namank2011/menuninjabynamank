@@ -277,7 +277,14 @@ def run_diagnostics(verbose: bool = True) -> Dict[str, Any]:
     load_dotenv()
     
     # Grab configs
-    from ollama_client import OLLAMA_BASE_URL, TEXT_MODEL, VISION_MODEL, GEMINI_API_KEY
+    from ollama_client import (
+        GEMINI_API_KEY,
+        GEMINI_FALLBACK_MODELS,
+        GEMINI_MODEL,
+        OLLAMA_BASE_URL,
+        TEXT_MODEL,
+        VISION_MODEL,
+    )
     import requests
     
     ollama_check = {
@@ -286,8 +293,47 @@ def run_diagnostics(verbose: bool = True) -> Dict[str, Any]:
         "text_model_configured": TEXT_MODEL,
         "vision_model_configured": VISION_MODEL,
         "available_models": [],
-        "gemini_api_configured": bool(GEMINI_API_KEY)
+        "gemini_api_configured": bool(GEMINI_API_KEY),
+        "gemini_primary_model": GEMINI_MODEL,
+        "gemini_fallback_models": GEMINI_FALLBACK_MODELS,
+        "gemini_catalog_online": False,
+        "gemini_available_models": [],
     }
+
+    if GEMINI_API_KEY:
+        try:
+            gemini_response = requests.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                params={"key": GEMINI_API_KEY},
+                timeout=10,
+            )
+            if gemini_response.status_code == 200:
+                gemini_models = gemini_response.json().get("models", [])
+                gemini_names = [
+                    model.get("name", "").removeprefix("models/")
+                    for model in gemini_models
+                ]
+                gemini_check = ollama_check
+                gemini_check["gemini_catalog_online"] = True
+                gemini_check["gemini_available_models"] = [
+                    name
+                    for name in gemini_names
+                    if name in [GEMINI_MODEL, *GEMINI_FALLBACK_MODELS]
+                ]
+                if verbose:
+                    report_status(
+                        "Gemini Model Catalog",
+                        True,
+                        f"Configured models available: {len(gemini_check['gemini_available_models'])}",
+                    )
+            elif verbose:
+                report_warning(
+                    "Gemini Model Catalog",
+                    f"API returned HTTP {gemini_response.status_code}",
+                )
+        except Exception as err:
+            if verbose:
+                report_warning("Gemini Model Catalog", str(err))
     
     # Perform online check
     try:
