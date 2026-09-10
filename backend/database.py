@@ -50,6 +50,8 @@ def init_db():
                 sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
                 sql = sql.replace("REAL", "DOUBLE PRECISION")
             cursor.execute(sql)
+            if is_postgres:
+                conn.commit()
         except Exception as ddl_err:
             print(f"[DDL Error] Failed executing statement: {sql[:100]}... Error: {ddl_err}")
             # Try to roll back to keep connection active
@@ -75,6 +77,8 @@ def init_db():
     # Migration: add created_by column if missing (for existing databases)
     try:
         cursor.execute("SELECT created_by FROM drafts LIMIT 1")
+        if is_postgres:
+            conn.commit()
     except Exception:
         try:
             conn.rollback()
@@ -84,6 +88,8 @@ def init_db():
         # Backfill existing drafts to super admin
         try:
             cursor.execute("UPDATE drafts SET created_by = 'namankshetri2@gmail.com' WHERE created_by IS NULL")
+            if is_postgres:
+                conn.commit()
         except Exception:
             pass
     
@@ -154,6 +160,30 @@ def init_db():
     )
     """)
     
+    # POS Integration Companies Table
+    run_ddl("""
+    CREATE TABLE IF NOT EXISTS pos_companies (
+        id TEXT PRIMARY KEY,
+        company_name TEXT UNIQUE,
+        api_key TEXT UNIQUE,
+        output_format TEXT, -- 'shopverse', 'petpooja', 'urbanpiper', 'slickpos', 'json'
+        webhook_url TEXT,
+        created_at TEXT
+    )
+    """)
+
+    # Migration: add pos_company_id column if missing (for existing databases)
+    try:
+        cursor.execute("SELECT pos_company_id FROM drafts LIMIT 1")
+        if is_postgres:
+            conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        run_ddl("ALTER TABLE drafts ADD COLUMN pos_company_id TEXT")
+
     # Ensure super admin exists
     try:
         q_check = "SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER(?)"
@@ -167,21 +197,57 @@ def init_db():
 
         cursor.execute(q_check, ("namankshetri2@gmail.com",))
         cnt = cursor.fetchone()[0]
+        if is_postgres:
+            conn.commit()
         if cnt == 0:
             import hashlib
             # Hash password 2011@Naman with static seed representation
-            salt = "superadminsalt"
-            pwd_bytes = "2011@Naman".encode('utf-8')
-            salt_bytes = salt.encode('utf-8')
-            h = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt_bytes, 100000)
-            hash_str = f"{salt}:{h.hex()}"
-            
-            cursor.execute(q_insert, ("namankshetri2@gmail.com", "super_admin", hash_str, datetime.datetime.utcnow().isoformat()))
-            print("[Database] Super admin 'namankshetri2@gmail.com' successfully seeded!")
+            hashed = hashlib.sha256(( "2011@Naman" + "superadminsalt" ).encode("utf-8")).hexdigest()
+            cursor.execute(q_insert, ("namankshetri2@gmail.com", "super_admin", hashed, datetime.datetime.now().isoformat()))
+            if is_postgres:
+                conn.commit()
+            print("[Database] Super admin user successfully initialized.")
     except Exception as e:
-        print(f"Error seeding user: {e}")
+        print(f"Error initializing super admin or user check: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
-    conn.commit()
+    # Seed POS integration companies if not present
+    try:
+        q_pos_check = "SELECT COUNT(*) FROM pos_companies WHERE company_name = ?"
+        q_pos_insert = """
+            INSERT INTO pos_companies (id, company_name, api_key, output_format, webhook_url, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+        if is_postgres:
+            q_pos_check = q_pos_check.replace("?", "%s")
+            q_pos_insert = q_pos_insert.replace("?", "%s")
+
+        defaults = [
+            ("pos-1", "Petpooja", "petpooja-secret-key-999", "petpooja", None),
+            ("pos-2", "UrbanPiper", "urbanpiper-secret-key-888", "urbanpiper", None),
+            ("pos-3", "SlickPOS", "slickpos-secret-key-777", "slickpos", None),
+            ("pos-4", "ShopVerse", "shopverse-secret-key-666", "shopverse", None)
+        ]
+        for pid, name, key, fmt, wh in defaults:
+            cursor.execute(q_pos_check, (name,))
+            cnt = cursor.fetchone()[0]
+            if is_postgres:
+                conn.commit()
+            if cnt == 0:
+                cursor.execute(q_pos_insert, (pid, name, key, fmt, wh, datetime.datetime.utcnow().isoformat()))
+                if is_postgres:
+                    conn.commit()
+                print(f"[Database] POS Company '{name}' seeded successfully!")
+    except Exception as e:
+        print(f"Error seeding POS companies: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
     conn.close()
 
 
@@ -212,12 +278,12 @@ def execute_query(query: str, params: tuple = (), commit: bool = False, conn = N
         conn.close()
     return result
 
-def create_draft(business_name: str, defaults: Dict[str, Any], files: List[Dict[str, Any]], created_by: str = "namankshetri2@gmail.com", conn = None) -> str:
+def create_draft(business_name: str, defaults: Dict[str, Any], files: List[Dict[str, Any]], created_by: str = "namankshetri2@gmail.com", pos_company_id: Optional[str] = None, conn = None) -> str:
     draft_id = uuid.uuid4().hex[:12]
     now = datetime.datetime.now().isoformat()
     execute_query(
-        "INSERT INTO drafts (id, business_name, created_at, updated_at, defaults, files, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (draft_id, business_name, now, now, json.dumps(defaults), json.dumps(files), "Draft", created_by),
+        "INSERT INTO drafts (id, business_name, created_at, updated_at, defaults, files, status, created_by, pos_company_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (draft_id, business_name, now, now, json.dumps(defaults), json.dumps(files), "Draft", created_by, pos_company_id),
         commit=True,
         conn=conn
     )
@@ -275,12 +341,13 @@ def update_draft_item(draft_id: str, item_id: str, item: Dict[str, Any], user: s
     
     execute_query("""
         UPDATE draft_items SET
-            category_name = ?, product_name = ?, variant_group_name = ?, variations = ?, 
+            source = ?, category_name = ?, product_name = ?, variant_group_name = ?, variations = ?, 
             description = ?, dietary_tag = ?, master_status = ?, menu_status = ?, stock_status = ?, 
             item_code = ?, station = ?, preparation_time = ?, image_url_1 = ?, image_url_2 = ?, image_url_3 = ?, 
             tax_category = ?, tax_type = ?, tax_value = ?, review_status = ?, approved = ?
         WHERE id = ? AND draft_id = ?
     """, (
+        json.dumps(item.get("source", {})),
         item.get("categoryName", "Uncategorized"),
         item.get("productName", ""),
         item.get("variantGroupName", ""),
@@ -327,13 +394,14 @@ def update_draft_item(draft_id: str, item_id: str, item: Dict[str, Any], user: s
             log_audit(draft_id, "UPDATE_ITEM", f"Updated product '{new_name}' ({item_id}): " + ", ".join(changes), user, conn=conn)
 
 def get_draft(draft_id: str, conn = None) -> Optional[Dict[str, Any]]:
-    rows = execute_query("SELECT id, business_name, created_at, updated_at, defaults, files, status, created_by FROM drafts WHERE id = ?", (draft_id,), conn=conn)
+    rows = execute_query("SELECT id, business_name, created_at, updated_at, defaults, files, status, created_by, pos_company_id FROM drafts WHERE id = ?", (draft_id,), conn=conn)
     if not rows:
         return None
     
     row = rows[0]
     d_id, bus_name, created, updated, defaults, files, status = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
     created_by = row[7] if len(row) > 7 else "namankshetri2@gmail.com"
+    pos_company_id = row[8] if len(row) > 8 else None
     
     # Get items
     item_rows = execute_query("""
@@ -380,6 +448,7 @@ def get_draft(draft_id: str, conn = None) -> Optional[Dict[str, Any]]:
         "files": json.loads(files or "[]"),
         "status": status,
         "createdBy": created_by,
+        "posCompanyId": pos_company_id,
         "items": items
     }
 
@@ -510,4 +579,67 @@ def delete_user(email: str):
 
 def update_user_allowed(email: str, is_allowed: bool):
     execute_query("UPDATE users SET is_allowed = ? WHERE LOWER(email) = LOWER(?)", (int(is_allowed), email.strip()), commit=True)
+
+
+def create_pos_company(company_name: str, output_format: str, webhook_url: Optional[str] = None, api_key: Optional[str] = None, conn = None) -> Dict[str, Any]:
+    company_id = uuid.uuid4().hex[:12]
+    if not api_key:
+        api_key = f"pos-{uuid.uuid4().hex[:16]}"
+    now = datetime.datetime.utcnow().isoformat()
+    execute_query("""
+        INSERT INTO pos_companies (id, company_name, api_key, output_format, webhook_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (company_id, company_name.strip(), api_key.strip(), output_format.strip().lower(), webhook_url.strip() if webhook_url else None, now),
+        commit=True,
+        conn=conn
+    )
+    return {
+        "id": company_id,
+        "company_name": company_name,
+        "api_key": api_key,
+        "output_format": output_format,
+        "webhook_url": webhook_url,
+        "created_at": now
+    }
+
+def get_pos_company_by_api_key(api_key: str, conn = None) -> Optional[Dict[str, Any]]:
+    rows = execute_query("SELECT id, company_name, api_key, output_format, webhook_url, created_at FROM pos_companies WHERE api_key = ?", (api_key.strip(),), conn=conn)
+    if rows:
+        r = rows[0]
+        return {
+            "id": r[0],
+            "company_name": r[1],
+            "api_key": r[2],
+            "output_format": r[3],
+            "webhook_url": r[4],
+            "created_at": r[5]
+        }
+    return None
+
+def get_all_pos_companies(conn = None) -> List[Dict[str, Any]]:
+    rows = execute_query("SELECT id, company_name, api_key, output_format, webhook_url, created_at FROM pos_companies ORDER BY created_at DESC", conn=conn)
+    return [{
+        "id": r[0],
+        "company_name": r[1],
+        "api_key": r[2],
+        "output_format": r[3],
+        "webhook_url": r[4],
+        "created_at": r[5]
+    } for r in rows]
+
+def delete_pos_company(company_id: str, conn = None):
+    execute_query("DELETE FROM pos_companies WHERE id = ?", (company_id.strip(),), commit=True, conn=conn)
+
+def update_pos_company(company_id: str, updates: Dict[str, Any], conn = None):
+    fields = []
+    params = []
+    for k, v in updates.items():
+        if k in ["company_name", "output_format", "webhook_url", "api_key"]:
+            fields.append(f"{k} = ?")
+            params.append(v)
+    if fields:
+        params.append(company_id)
+        query = f"UPDATE pos_companies SET {', '.join(fields)} WHERE id = ?"
+        execute_query(query, tuple(params), commit=True, conn=conn)
+
 

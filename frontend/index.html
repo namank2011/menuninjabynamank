@@ -89,6 +89,10 @@
                 <button class="nav-btn" id="btn-users" onclick="switchView('users')" style="display: none;">
                     <i class="fa-solid fa-user-shield"></i> User Management
                 </button>
+                <button class="nav-btn" id="btn-pos-integrations" onclick="switchView('pos-integrations')"
+                    style="display: none;">
+                    <i class="fa-solid fa-link"></i> POS Integrations
+                </button>
                 <div class="nav-section-title">Review Steps</div>
                 <div class="stages-links">
                     <button class="step-nav-btn" data-step="1" disabled onclick="goToStep(1)">
@@ -169,6 +173,82 @@
                                 <tr>
                                     <td colspan="5" class="empty-state">
                                         <i class="fa-solid fa-spinner fa-spin"></i> Loading whitelist records...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- POS Integrations View -->
+            <section id="view-pos-integrations" class="content-view">
+                <style>
+                    /* Inline styling for POS integration lists */
+                    .pos-key-copy-btn {
+                        background: transparent;
+                        border: 1px solid var(--border-glass);
+                        color: var(--text-muted);
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 11px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        margin-left: 8px;
+                        transition: all 0.2s;
+                    }
+
+                    .pos-key-copy-btn:hover {
+                        color: var(--primary);
+                        border-color: var(--primary);
+                        background: rgba(94, 122, 70, 0.05);
+                    }
+
+                    .pos-badge {
+                        background: rgba(94, 122, 70, 0.1);
+                        color: var(--primary);
+                        padding: 4px 8px;
+                        border-radius: 6px;
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                    }
+                </style>
+                <div class="dashboard-grid">
+                    <div class="dash-welcome-card glassmorphic">
+                        <div class="welcome-text">
+                            <h3>POS Integrations & API Keys</h3>
+                            <p>Integrate Menu Ninja with external POS companies. Register a POS company, generate a
+                                secure API key, configure their target format, and set optional webhook endpoints for
+                                real-time extraction delivery.</p>
+                        </div>
+                        <button class="primary-btn" onclick="openAddPOSCompanyModal()">
+                            <i class="fa-solid fa-plus"></i> Register POS Integration
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-container">
+                    <div class="section-header">
+                        <h2>Active POS Integrations</h2>
+                    </div>
+                    <div class="drafts-table-container glassmorphic">
+                        <table class="grid-table">
+                            <thead>
+                                <tr>
+                                    <th>Integrated Company</th>
+                                    <th>API Key (Bearer Token)</th>
+                                    <th>Target Output Format</th>
+                                    <th>Webhook URL</th>
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pos-companies-body">
+                                <tr>
+                                    <td colspan="5" class="empty-state">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading registered POS systems...
                                     </td>
                                 </tr>
                             </tbody>
@@ -315,10 +395,18 @@
                             <div class="form-group">
                                 <label for="form-extraction-engine">Extraction Engine</label>
                                 <select id="form-extraction-engine"
-                                    style="border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--card-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s;">
+                                    style="border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--card-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; width: 100%;">
                                     <option value="gemini" selected>Google Gemini Cloud (Recommended)</option>
                                     <option value="ollama">Ollama Local (llama3.1:latest)</option>
                                     <option value="heuristics">Heuristics (Offline OCR Bypass)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="form-pos-company">Associate POS Integration</label>
+                                <select id="form-pos-company"
+                                    style="border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background-color: var(--card-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; width: 100%;">
+                                    <option value="" selected>None (Standard ShopVerse format)</option>
+                                    <!-- Populated dynamically -->
                                 </select>
                             </div>
                         </div>
@@ -729,6 +817,57 @@
                     <button type="button" class="secondary-btn" onclick="toggleAddUserModal()">Cancel</button>
                     <button type="submit" class="primary-btn"><i class="fa-solid fa-user-check"
                             style="margin-right:6px;"></i>Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit POS Integration Modal -->
+    <div class="add-user-modal-box" id="add-pos-modal" style="display: none;">
+        <div class="add-user-card glassmorphic">
+            <div class="add-user-header">
+                <h3 class="add-user-title" id="pos-modal-title"><i class="fa-solid fa-link"
+                        style="margin-right:8px;"></i>Register POS Integration</h3>
+                <button class="add-user-close-btn" onclick="toggleAddPOSModal()">&times;</button>
+            </div>
+            <form id="add-pos-form" onsubmit="handlePOSSubmit(event)">
+                <input type="hidden" id="pos-company-id-input">
+                <div class="add-user-body">
+                    <div class="add-user-group">
+                        <label for="pos-company-name" class="add-user-label">Integrated Company Name</label>
+                        <input type="text" id="pos-company-name" required placeholder="e.g. Petpooja India"
+                            class="add-user-input">
+                    </div>
+                    <div class="add-user-group">
+                        <label for="pos-output-format" class="add-user-label">Target Output Format</label>
+                        <select id="pos-output-format" class="add-user-select">
+                            <option value="shopverse" selected>ShopVerse (Standard Excel)</option>
+                            <option value="petpooja">Petpooja (Custom Excel)</option>
+                            <option value="slickpos">SlickPOS (Custom Excel)</option>
+                            <option value="urbanpiper">UrbanPiper (Custom JSON)</option>
+                            <option value="json">Generic JSON Output</option>
+                        </select>
+                    </div>
+                    <div class="add-user-group">
+                        <label for="pos-webhook-url" class="add-user-label">Webhook URL Delivery Destination
+                            (Optional)</label>
+                        <input type="url" id="pos-webhook-url" placeholder="https://api.yourpos.com/v1/menu-receiver"
+                            class="add-user-input">
+                        <p style="font-size:11px; color:var(--text-secondary); margin:4px 0 0 0;">If set, Menu Ninja
+                            will automatically POST the extracted/approved JSON or file details to this URL.</p>
+                    </div>
+                    <div class="add-user-group">
+                        <label for="pos-api-key" class="add-user-label">API Key / Token (Optional)</label>
+                        <input type="text" id="pos-api-key" placeholder="Leave empty to auto-generate a secure token"
+                            class="add-user-input">
+                        <p style="font-size:11px; color:var(--text-secondary); margin:4px 0 0 0;">The POS partner must
+                            send this token in the 'X-POS-API-Key' header when calling the extraction api.</p>
+                    </div>
+                </div>
+                <div class="add-user-footer">
+                    <button type="button" class="secondary-btn" onclick="toggleAddPOSModal()">Cancel</button>
+                    <button type="submit" class="primary-btn" id="pos-btn-submit"><i class="fa-solid fa-save"
+                            style="margin-right:6px;"></i>Save Integration</button>
                 </div>
             </form>
         </div>

@@ -82,21 +82,35 @@ def _get_prompt_with_memory() -> str:
         from database import get_learned_corrections
         cat_memory = get_learned_corrections("category")
         prod_memory = get_learned_corrections("product_name")
+        prod_cat_memory = get_learned_corrections("product_category")
+        prod_diet_memory = get_learned_corrections("product_dietary")
     except Exception:
         cat_memory = {}
         prod_memory = {}
+        prod_cat_memory = {}
+        prod_diet_memory = {}
         
     guidelines = []
     
     if prod_memory:
         guidelines.append("--- Corrected Naming Guidelines (Format matching items as below) ---")
-        for orig, corr in list(prod_memory.items())[:5]:
+        for orig, corr in list(prod_memory.items())[:15]:
             guidelines.append(f'- Formatting "{orig}" -> output: "{corr}"')
             
-    if cat_memory:
+    if prod_cat_memory:
         guidelines.append("--- Corrected Category Guidelines (Classify matching items as below) ---")
-        for orig, corr in list(cat_memory.items())[:5]:
-            guidelines.append(f'- Classify "{orig}" under category: "{corr}"')
+        for orig, corr in list(prod_cat_memory.items())[:15]:
+            guidelines.append(f'- Classify dish "{orig}" under category: "{corr}"')
+
+    if prod_diet_memory:
+        guidelines.append("--- Corrected Dietary Guidelines (Tag matching items as below) ---")
+        for orig, corr in list(prod_diet_memory.items())[:15]:
+            guidelines.append(f'- Tag dish "{orig}" with dietary tag: "{corr}"')
+            
+    if cat_memory:
+        guidelines.append("--- Category Correction Guidelines ---")
+        for orig, corr in list(cat_memory.items())[:10]:
+            guidelines.append(f'- Category "{orig}" should be mapped to category: "{corr}"')
             
     if guidelines:
         return MENU_EXTRACTION_PROMPT + "\n\n" + "\n".join(guidelines)

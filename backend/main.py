@@ -7,6 +7,9 @@ import json
 import os
 import sys
 import datetime
+import base64
+import hmac
+import hashlib
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -29,10 +32,12 @@ from file_extractors import extract_menu_from_file, SUPPORTED_IMAGE_EXTS
 from database import (
     init_db, create_draft, add_draft_item, get_draft, 
     get_all_drafts, update_draft_item, get_audit_logs, log_audit, delete_draft,
-    save_learned_correction, execute_query
+    save_learned_correction, execute_query,
+    create_pos_company, get_pos_company_by_api_key, get_all_pos_companies,
+    delete_pos_company, update_pos_company
 )
 from validation import validate_menu, load_validation_lists
-from exporter import export_approved_menu, generate_review_report
+from exporter import export_approved_menu, generate_review_report, export_pos_menu
 from ollama_client import OLLAMA_BASE_URL, TEXT_MODEL, REQUEST_TIMEOUT_SECONDS
 import requests
 
@@ -94,10 +99,7 @@ def startup_event():
     init_db()
 
 
-import hmac
-import hashlib
-import json
-import base64
+# Helper cryptography functions
 import time
 from fastapi.security import APIKeyCookie
 from fastapi import Security, Depends, HTTPException, Header
@@ -392,26 +394,27 @@ def get_draft_details(draft_id: str, user=Depends(get_current_user)):
     draft["items"] = validated
     return draft
 
-@app.post("/api/drafts")
-async def create_new_draft(
-    business_name: str = Form(...),
-    menu_files: List[UploadFile] = File(...),
-    template_file: Optional[UploadFile] = File(None),
-    default_template: bool = Form(True),
-    tax_category: str = Form("Services"),
-    tax_type: str = Form("GST"),
-    tax_value: float = Form(5.0),
-    master_status: str = Form("Active"),
-    menu_status: str = Form("Active"),
-    stock_status: str = Form("Active"),
-    station: str = Form("Kitchen"),
-    preparation_time: str = Form(""),
-    default_dietary: str = Form(""),
-    direct_approve: bool = Form(False),
-    extraction_engine: str = Form("auto"),
-    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key"),
-    user=Depends(get_current_user)
-):
+def trigger_webhook_task(webhook_url: str, payload: Dict[str, Any]):
+    try:
+        import requests
+        r = requests.post(webhook_url, json=payload, headers={"Content-Type": "application/json"}, timeout=20)
+        print(f"[Webhook] Sent payload to {webhook_url}. Status code: {r.status_code}")
+    except Exception as e:
+        print(f"[Webhook Error] Failed to POST webhook to {webhook_url}: {str(e)}")
+
+
+async def execute_extraction_pipeline(
+    business_name: str,
+    menu_files: List[UploadFile],
+    template_file: Optional[UploadFile],
+    default_template: bool,
+    defaults_dict: Dict[str, Any],
+    extraction_engine: str,
+    direct_approve: bool,
+    x_gemini_api_key: Optional[str],
+    created_by: str,
+    pos_company_id: Optional[str] = None
+) -> Any:
     # Save template
     run_id = uuid.uuid4().hex[:10]
     if default_template:
@@ -434,18 +437,6 @@ async def create_new_draft(
     # Save uploaded files & run extractions
     saved_files = []
     all_extracted_items = []
-    
-    defaults_dict = {
-        "taxCategory": tax_category,
-        "taxType": tax_type,
-        "taxValue": tax_value,
-        "masterStatus": master_status,
-        "menuStatus": menu_status,
-        "stockStatus": stock_status,
-        "station": station,
-        "preparationTime": preparation_time,
-        "dietaryTag": default_dietary
-    }
     errors_encountered = []
     
     # Save all uploaded files to disk first
@@ -473,6 +464,16 @@ async def create_new_draft(
     if all_images and len(saved_paths) > 1:
         if extraction_engine == "gemini" or (extraction_engine == "auto" and gemini_key):
             use_gemini_batch = True
+
+    default_dietary = defaults_dict.get("dietaryTag", "")
+    master_status = defaults_dict.get("masterStatus", "Active")
+    menu_status = defaults_dict.get("menuStatus", "Active")
+    stock_status = defaults_dict.get("stockStatus", "Active")
+    station = defaults_dict.get("station", "Kitchen")
+    preparation_time = defaults_dict.get("preparationTime", "")
+    tax_category = defaults_dict.get("taxCategory", "Services")
+    tax_type = defaults_dict.get("taxType", "GST")
+    tax_value = defaults_dict.get("taxValue", 5.0)
 
     if use_gemini_batch:
         print(f"Batching {len(saved_paths)} uploaded images together for unified Gemini extraction...")
@@ -554,57 +555,82 @@ async def create_new_draft(
             use_gemini_batch = False
 
     if not use_gemini_batch:
-        for menu_file, file_path, file_info in saved_paths:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        def _parallel_extract(menu_f, f_path, f_info):
             import time
-            start_time = time.time()
+            start = time.time()
             try:
-                extraction = extract_menu_from_file(file_path, engine=extraction_engine, api_key=x_gemini_api_key)
-                execution_seconds = time.time() - start_time
-                file_info["timeSeconds"] = round(execution_seconds, 2)
-                print(f"Extraction for {menu_file.filename} took {execution_seconds:.2f} seconds using engine '{extraction_engine}'.")
+                ext = extract_menu_from_file(f_path, engine=extraction_engine, api_key=x_gemini_api_key)
+                duration = time.time() - start
+                return (menu_f, f_path, f_info, ext, duration, None)
+            except Exception as ex:
+                duration = time.time() - start
+                return (menu_f, f_path, f_info, None, duration, ex)
+        
+        extraction_results = [None] * len(saved_paths)
+        with ThreadPoolExecutor(max_workers=min(len(saved_paths), 6)) as executor:
+            futures = {
+                executor.submit(_parallel_extract, menu_f, f_path, f_info): idx
+                for idx, (menu_f, f_path, f_info) in enumerate(saved_paths)
+            }
+            for fut in as_completed(futures):
+                idx = futures[fut]
+                extraction_results[idx] = fut.result()
                 
-                for page_item in extraction.items:
-                    # Map variations
-                    variations = []
-                    for v in page_item.variations:
-                        variations.append({
-                            "name": v.name,
-                            "sellingPrice": v.price,
-                            "listingPrice": v.listing_price,
-                            "confidence": page_item.confidence
-                        })
-                        
-                    mapped_item = {
-                        "source": {
-                            "fileName": menu_file.filename,
-                            "page": 1,
-                            "rawText": page_item.source_text,
-                            "confidence": page_item.confidence,
-                            "initialCategory": page_item.category or "Uncategorized",
-                            "initialProductName": page_item.product_name
-                        },
-                        "categoryName": page_item.category or "Uncategorized",
-                        "productName": page_item.product_name,
-                        "variantGroupName": "Portion" if any(n.lower() in ["half", "full"] for n in [v["name"] for v in variations]) else ("Size" if len(variations) > 1 else ""),
-                        "variations": variations,
-                        "description": page_item.description or "",
-                        "dietaryTag": page_item.dietary_tag or default_dietary,
-                        "masterStatus": master_status,
-                        "menuStatus": menu_status,
-                        "stockStatus": stock_status,
-                        "itemCode": page_item.item_code or "",
-                        "station": page_item.station or station,
-                        "preparationTime": page_item.preparation_time or preparation_time,
-                        "imageUrl1": page_item.image_url_1 or "",
-                        "imageUrl2": "",
-                        "imageUrl3": "",
-                        "taxCategory": tax_category,
-                        "taxType": tax_type,
-                        "taxValue": tax_value,
-                        "reviewStatus": "Not Reviewed",
-                        "approved": True if direct_approve else False
-                    }
-                    all_extracted_items.append(mapped_item)
+        for res in extraction_results:
+            if not res:
+                continue
+            menu_file, file_path, file_info, extraction, execution_seconds, err = res
+            file_info["timeSeconds"] = round(execution_seconds, 2)
+            
+            try:
+                if err is not None:
+                    raise err
+                if extraction:
+                    print(f"Extraction for {menu_file.filename} took {execution_seconds:.2f} seconds using engine '{extraction_engine}'.")
+                    for page_item in extraction.items:
+                        # Map variations
+                        variations = []
+                        for v in page_item.variations:
+                            variations.append({
+                                "name": v.name,
+                                "sellingPrice": v.price,
+                                "listingPrice": v.listing_price,
+                                "confidence": page_item.confidence
+                            })
+                            
+                        mapped_item = {
+                            "source": {
+                                "fileName": menu_file.filename,
+                                "page": 1,
+                                "rawText": page_item.source_text,
+                                "confidence": page_item.confidence,
+                                "initialCategory": page_item.category or "Uncategorized",
+                                "initialProductName": page_item.product_name
+                            },
+                            "categoryName": page_item.category or "Uncategorized",
+                            "productName": page_item.product_name,
+                            "variantGroupName": "Portion" if any(n.lower() in ["half", "full"] for n in [v["name"] for v in variations]) else ("Size" if len(variations) > 1 else ""),
+                            "variations": variations,
+                            "description": page_item.description or "",
+                            "dietaryTag": page_item.dietary_tag or default_dietary,
+                            "masterStatus": master_status,
+                            "menuStatus": menu_status,
+                            "stockStatus": stock_status,
+                            "itemCode": page_item.item_code or "",
+                            "station": page_item.station or station,
+                            "preparationTime": page_item.preparation_time or preparation_time,
+                            "imageUrl1": page_item.image_url_1 or "",
+                            "imageUrl2": "",
+                            "imageUrl3": "",
+                            "taxCategory": tax_category,
+                            "taxType": tax_type,
+                            "taxValue": tax_value,
+                            "reviewStatus": "Not Reviewed",
+                            "approved": True if direct_approve else False
+                        }
+                        all_extracted_items.append(mapped_item)
             except Exception as err:
                 print(f"Error extracting from {menu_file.filename}: {err}")
                 errors_encountered.append(f"{menu_file.filename}: {str(err)}")
@@ -654,7 +680,7 @@ async def create_new_draft(
     from database import get_db_connection
     conn = get_db_connection()
     try:
-        draft_id = create_draft(business_name, defaults_dict, saved_files, created_by=user["email"], conn=conn)
+        draft_id = create_draft(business_name, defaults_dict, saved_files, created_by=created_by, pos_company_id=pos_company_id, conn=conn)
         
         # Save template path to metadata
         defaults_dict["templatePath"] = str(template_path)
@@ -689,8 +715,14 @@ async def create_new_draft(
     if direct_approve:
         import re
         safe_business_name = re.sub(r'[\\/*?:"<>| ]', "_", business_name)
-        output_filename = f"{safe_business_name}_Menu_Ninja.xlsx"
-        output_path = OUTPUT_DIR / output_filename
+        
+        output_format = "shopverse"
+        webhook_url = None
+        if pos_company_id:
+            from database import execute_query
+            rows = execute_query("SELECT company_name, output_format, webhook_url FROM pos_companies WHERE id = ?", (pos_company_id,))
+            if rows:
+                company_name, output_format, webhook_url = rows[0]
         
         # update draft details status to Approved
         conn = get_db_connection()
@@ -702,7 +734,16 @@ async def create_new_draft(
         
         # fetch fresh details with final item status
         draft = get_draft(draft_id)
-        export_approved_menu(DEFAULT_TEMPLATE, output_path, draft["items"], business_name)
+        
+        if output_format in ["urbanpiper", "json"]:
+            output_filename = f"{safe_business_name}_{output_format}_Menu.json"
+            mime_type = "application/json"
+        else:
+            output_filename = f"{safe_business_name}_{output_format}_Menu.xlsx"
+            mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            
+        output_path = OUTPUT_DIR / output_filename
+        export_pos_menu(output_format, draft["items"], business_name, output_path, template_path)
         
         report_json_name = f"{safe_business_name}_review_report.json"
         report_txt_name = f"{safe_business_name}_review_report.txt"
@@ -712,19 +753,279 @@ async def create_new_draft(
         audit_logs = get_audit_logs(draft_id)
         generate_review_report(draft, audit_logs, report_json_path, report_txt_path)
         
-        log_audit(draft_id, "EXPORT_MENU", f"Menu approved and Excel file generated: {output_filename}", user="System Direct Approver")
+        log_audit(draft_id, "EXPORT_MENU", f"Menu approved and output file generated in format '{output_format}': {output_filename}", user="System Direct Approver")
         
+        # Read the file to Base64 to return
+        import base64
+        file_b64 = ""
+        try:
+            if output_path.exists():
+                with open(output_path, "rb") as f:
+                    file_b64 = base64.b64encode(f.read()).decode("utf-8")
+        except Exception:
+            pass
+
+        # Dispatch webhook if configured
+        if webhook_url:
+            payload = {}
+            if output_format in ["urbanpiper", "json"]:
+                try:
+                    payload = json.loads(output_path.read_text(encoding="utf-8"))
+                except Exception:
+                    payload = {"items": draft["items"]}
+            else:
+                payload = {
+                    "event": "menu.approved",
+                    "business_name": business_name,
+                    "draft_id": draft_id,
+                    "company_name": pos_company_id,
+                    "output_format": output_format,
+                    "output_file_name": output_filename,
+                    "file_content_base64": file_b64,
+                    "items": [it for it in draft["items"] if it.get("approved")]
+                }
+            
+            import threading
+            threading.Thread(target=trigger_webhook_task, args=(webhook_url, payload), daemon=True).start()
+
+        # Delete local copy of output files
+        for p in [output_path, report_json_path, report_txt_path]:
+            if p.exists():
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
         return {
             "status": "success",
             "direct_approved": True,
             "draftId": draft_id,
             "outputFile": output_filename,
-            "downloadOutputUrl": f"/download/{output_filename}",
-            "downloadReviewReportJsonUrl": f"/download/{report_json_name}",
-            "downloadReviewReportTxtUrl": f"/download/{report_txt_name}"
+            "downloadOutputUrl": f"data:{mime_type};base64,{file_b64}",
+            "downloadReviewReportJsonUrl": f"data:application/json;base64,{base64.b64encode(json.dumps(draft['items']).encode('utf-8')).decode('utf-8')}",
+            "file_content_base64": file_b64,
+            "items": draft["items"]
         }
 
     return {"status": "success", "draftId": draft_id}
+
+
+@app.post("/api/drafts")
+async def create_new_draft(
+    business_name: str = Form(...),
+    menu_files: List[UploadFile] = File(...),
+    template_file: Optional[UploadFile] = File(None),
+    default_template: bool = Form(True),
+    tax_category: str = Form("Services"),
+    tax_type: str = Form("GST"),
+    tax_value: float = Form(5.0),
+    master_status: str = Form("Active"),
+    menu_status: str = Form("Active"),
+    stock_status: str = Form("Active"),
+    station: str = Form("Kitchen"),
+    preparation_time: str = Form(""),
+    default_dietary: str = Form(""),
+    direct_approve: bool = Form(False),
+    extraction_engine: str = Form("auto"),
+    pos_company_id: Optional[str] = Form(None),
+    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key"),
+    user=Depends(get_current_user)
+):
+    defaults_dict = {
+        "taxCategory": tax_category,
+        "taxType": tax_type,
+        "taxValue": tax_value,
+        "masterStatus": master_status,
+        "menuStatus": menu_status,
+        "stockStatus": stock_status,
+        "station": station,
+        "preparationTime": preparation_time,
+        "dietaryTag": default_dietary
+    }
+    return await execute_extraction_pipeline(
+        business_name=business_name,
+        menu_files=menu_files,
+        template_file=template_file,
+        default_template=default_template,
+        defaults_dict=defaults_dict,
+        extraction_engine=extraction_engine,
+        direct_approve=direct_approve,
+        x_gemini_api_key=x_gemini_api_key,
+        created_by=user["email"],
+        pos_company_id=pos_company_id
+    )
+
+
+# ----------------- POS PARTNER WEBHOOKS & API KEY MANAGEMENT (ADMIN ONLY) -----------------
+@app.get("/api/admin/pos-companies")
+def list_pos_companies(admin=Depends(get_super_admin)):
+    return get_all_pos_companies()
+
+
+@app.post("/api/admin/pos-companies")
+def register_pos_company(payload: Dict[str, Any] = Body(...), admin=Depends(get_super_admin)):
+    company_name = payload.get("company_name", "").strip()
+    output_format = payload.get("output_format", "shopverse").strip().lower()
+    webhook_url = payload.get("webhook_url", "").strip() or None
+    api_key = payload.get("api_key", "").strip() or None
+    
+    if not company_name:
+        return JSONResponse(status_code=400, content={"error": "company_name is required"})
+    if output_format not in ["shopverse", "petpooja", "urbanpiper", "slickpos", "json"]:
+        return JSONResponse(status_code=400, content={"error": "Unsupported output_format"})
+        
+    try:
+        new_company = create_pos_company(company_name, output_format, webhook_url, api_key)
+        return {"status": "success", "pos_company": new_company}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to register POS company: {str(e)}"})
+
+
+@app.put("/api/admin/pos-companies/{company_id}")
+def update_pos_company_details(company_id: str, payload: Dict[str, Any] = Body(...), admin=Depends(get_super_admin)):
+    try:
+        update_pos_company(company_id, payload)
+        return {"status": "success", "message": "POS company updated successfully"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to update POS company: {str(e)}"})
+
+
+@app.delete("/api/admin/pos-companies/{company_id}")
+def delete_pos_company_integration(company_id: str, admin=Depends(get_super_admin)):
+    try:
+        delete_pos_company(company_id)
+        return {"status": "success", "message": "POS company deleted successfully"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to delete POS company: {str(e)}"})
+
+
+# ----------------- UNIFIED POS API INTEGRATION ENDPOINT -----------------
+@app.post("/api/v1/pos/extract")
+async def pos_extract_menu(
+    business_name: str = Form(...),
+    menu_files: List[UploadFile] = File(...),
+    api_key: Optional[str] = Query(None),
+    x_pos_api_key: Optional[str] = Header(None, alias="X-POS-API-Key"),
+    extraction_engine: str = Form("auto"),
+    direct_approve: bool = Form(True),
+    tax_category: str = Form("Services"),
+    tax_type: str = Form("GST"),
+    tax_value: float = Form(5.0),
+    master_status: str = Form("Active"),
+    default_dietary: str = Form(""),
+    station: str = Form("Kitchen"),
+    preparation_time: str = Form(""),
+    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key")
+):
+    key = x_pos_api_key or api_key
+    if not key:
+        return JSONResponse(status_code=401, content={"error": "API Key is required via header 'X-POS-API-Key' or parameter 'api_key'"})
+        
+    pos_company = get_pos_company_by_api_key(key)
+    if not pos_company:
+        return JSONResponse(status_code=401, content={"error": "Invalid or inactive POS API Key"})
+
+    defaults_dict = {
+        "taxCategory": tax_category,
+        "taxType": tax_type,
+        "taxValue": tax_value,
+        "masterStatus": master_status,
+        "menuStatus": "Active",
+        "stockStatus": "Active",
+        "station": station,
+        "preparationTime": preparation_time,
+        "dietaryTag": default_dietary
+    }
+    
+    # Delegate to core execution pipeline
+    return await execute_extraction_pipeline(
+        business_name=business_name,
+        menu_files=menu_files,
+        template_file=None,
+        default_template=True,
+        defaults_dict=defaults_dict,
+        extraction_engine=extraction_engine,
+        direct_approve=direct_approve,
+        x_gemini_api_key=x_gemini_api_key,
+        created_by=f"POS: {pos_company['company_name']}",
+        pos_company_id=pos_company["id"]
+    )
+
+def _is_item_changed(old: Dict[str, Any], new: Dict[str, Any]) -> bool:
+    fields = [
+        ("categoryName", "Uncategorized"),
+        ("productName", ""),
+        ("variantGroupName", ""),
+        ("description", ""),
+        ("dietaryTag", ""),
+        ("masterStatus", "Active"),
+        ("menuStatus", "Active"),
+        ("stockStatus", "Active"),
+        ("itemCode", ""),
+        ("station", "Kitchen"),
+        ("preparationTime", ""),
+        ("imageUrl1", ""),
+        ("imageUrl2", ""),
+        ("imageUrl3", ""),
+        ("taxCategory", "Services"),
+        ("taxType", "GST"),
+        ("reviewStatus", "Not Reviewed"),
+    ]
+    for field, default in fields:
+        if old.get(field, default) != new.get(field, default):
+            return True
+            
+    # Check tax value (float comparison)
+    old_tax = old.get("taxValue")
+    new_tax = new.get("taxValue")
+    if old_tax is None: old_tax = 5.0
+    if new_tax is None: new_tax = 5.0
+    try:
+        if abs(float(old_tax) - float(new_tax)) > 0.0001:
+            return True
+    except (ValueError, TypeError):
+        if old_tax != new_tax:
+            return True
+        
+    # Check approved (bool comparison)
+    if bool(old.get("approved")) != bool(new.get("approved")):
+        return True
+        
+    # Check variations
+    old_vars = old.get("variations", [])
+    new_vars = new.get("variations", [])
+    if len(old_vars) != len(new_vars):
+        return True
+    for ov, nv in zip(old_vars, new_vars):
+        if ov.get("name") != nv.get("name"):
+            return True
+        o_price = ov.get("price") or ov.get("sellingPrice")
+        n_price = nv.get("price") or nv.get("sellingPrice")
+        try:
+            if abs(float(o_price or 0) - float(n_price or 0)) > 0.0001:
+                return True
+        except (ValueError, TypeError):
+            if o_price != n_price:
+                return True
+        o_lp = ov.get("listing_price") or ov.get("listingPrice")
+        n_lp = nv.get("listing_price") or nv.get("listingPrice")
+        try:
+            if abs(float(o_lp or 0) - float(n_lp or 0)) > 0.0001:
+                return True
+        except (ValueError, TypeError):
+            if o_lp != n_lp:
+                return True
+            
+    # Check source metadata
+    old_src = old.get("source", {})
+    new_src = new.get("source", {})
+    if old_src.get("initialProductName") != new_src.get("initialProductName") or \
+       old_src.get("initialCategory") != new_src.get("initialCategory") or \
+       old_src.get("fileName") != new_src.get("fileName") or \
+       old_src.get("rawText") != new_src.get("rawText"):
+        return True
+        
+    return False
 
 @app.put("/api/drafts/{draft_id}")
 def update_draft(draft_id: str, data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
@@ -744,12 +1045,20 @@ def update_draft(draft_id: str, data: Dict[str, Any] = Body(...), user=Depends(g
                       (json.dumps(new_defaults), data.get("businessName", draft.get("businessName")), draft_id), 
                       commit=True, conn=conn)
 
-        # Update item list
+        # Update item list by comparing changes
         incoming_items = data.get("items", [])
+        existing_items_map = {it["id"]: it for it in draft.get("items", [])}
+        updated_any = False
+        
         for it in incoming_items:
-            update_draft_item(draft_id, it["id"], it, user=user.get("email", "Human Reviewer"), conn=conn)
+            old_it = existing_items_map.get(it["id"])
+            if not old_it or _is_item_changed(old_it, it):
+                update_draft_item(draft_id, it["id"], it, user=user.get("email", "Human Reviewer"), conn=conn)
+                updated_any = True
             
-        log_audit(draft_id, "UPDATE_DRAFT", "Draft changes and review steps saved.", user=user.get("email", "Human Reviewer"), conn=conn)
+        if updated_any:
+            log_audit(draft_id, "UPDATE_DRAFT", "Draft changes and review steps saved.", user=user.get("email", "Human Reviewer"), conn=conn)
+            
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -801,49 +1110,139 @@ def generate_batch_descriptions(
         return JSONResponse(status_code=403, content={"error": "You do not have access to this draft"})
         
     overwrite = payload.get("overwrite", False)
-    updated_count = 0
+    
+    items_to_generate = []
     for item in draft.get("items", []):
         if item["id"] in item_ids:
             if not item.get("description") or overwrite:
-                # Call Gemini/Ollama text model APIs to generate descriptive sentence
-                try:
-                    desc_prompt = f"Write a short, delicious, 1-sentence description (maximum 15 words) for the restaurant dish: '{item['productName']}'. Return ONLY the direct description sentence, do not add introductory phrases or quotes."
-                    gemini_key = x_gemini_api_key or os.getenv("GEMINI_API_KEY")
-                    if gemini_key:
-                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={gemini_key}"
-                        payload = {
-                            "contents": [{
-                                "parts": [{"text": desc_prompt}]
-                            }]
-                        }
-                        r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
-                        r.raise_for_status()
-                        res_data = r.json()
-                        ai_desc = res_data["candidates"][0]["content"]["parts"][0]["text"].strip().replace('"', '')
-                    else:
-                        ollama_payload = {
-                            "model": TEXT_MODEL,
-                            "prompt": desc_prompt,
-                            "stream": False,
-                            "options": {
-                                "temperature": 0.6,
-                                "num_predict": 30
+                items_to_generate.append(item)
+                
+    if not items_to_generate:
+        return {"status": "success", "updated": 0}
+        
+    gemini_key = x_gemini_api_key or os.getenv("GEMINI_API_KEY")
+    descriptions_map = {}
+    
+    # 1. Try batch extraction via Gemini if key is active
+    if gemini_key:
+        chunk_size = 20
+        for i in range(0, len(items_to_generate), chunk_size):
+            chunk = items_to_generate[i:i+chunk_size]
+            try:
+                prompt = (
+                    "Write a short, delicious, 1-sentence description (maximum 15 words) for each "
+                    "of the following restaurant dishes. Entice the customer, focus on flavor. "
+                    "Return a JSON object mapping each dish ID to its generated description as specified in the schema.\n\nDishes:\n"
+                )
+                for it in chunk:
+                    prompt += f"- ID: {it['id']}, Name: {it['productName']}\n"
+                    
+                schema = {
+                    "type": "object",
+                    "properties": {
+                        "descriptions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "description": {"type": "string"}
+                                },
+                                "required": ["id", "description"]
                             }
                         }
-                        url = f"{OLLAMA_BASE_URL}/api/generate"
-                        r = requests.post(url, json=ollama_payload, timeout=REQUEST_TIMEOUT_SECONDS)
-                        r.raise_for_status()
-                        ai_desc = r.json().get("response", "").strip().replace('"', '')
-                    
-                    if ai_desc:
-                        item["description"] = ai_desc
-                        # Mark review status to refresh validation
-                        item["reviewStatus"] = "Review Required" 
-                        update_draft_item(draft_id, item["id"], item, user="AI Description Generator")
-                        updated_count += 1
-                except Exception as err:
-                    print(f"Description generation failed: {err}")
+                    },
+                    "required": ["descriptions"]
+                }
                 
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={gemini_key}"
+                post_payload = {
+                    "contents": [{
+                        "parts": [{"text": prompt}]
+                    }],
+                    "generationConfig": {
+                        "responseMimeType": "application/json",
+                        "responseSchema": schema,
+                        "temperature": 0.5
+                    }
+                }
+                
+                from ollama_client import _post_to_gemini
+                r = _post_to_gemini(url, post_payload, {"Content-Type": "application/json"}, timeout=60)
+                r.raise_for_status()
+                res_data = r.json()
+                raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                parsed = json.loads(raw_text)
+                for desc_item in parsed.get("descriptions", []):
+                    if desc_item.get("id") and desc_item.get("description"):
+                        descriptions_map[desc_item["id"]] = desc_item["description"].replace('"', '')
+            except Exception as e:
+                print(f"Gemini batch description generation failed for chunk: {e}. Falling back to concurrent sequential generation.")
+                
+    # 2. Concurrently generate any remaining descriptions using ThreadPoolExecutor
+    remaining_items = [it for it in items_to_generate if it["id"] not in descriptions_map]
+    if remaining_items:
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def _get_single_desc(item):
+            desc_prompt = f"Write a short, delicious, 1-sentence description (maximum 15 words) for the restaurant dish: '{item['productName']}'. Return ONLY the direct description sentence, do not add introductory phrases or quotes."
+            try:
+                if gemini_key:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={gemini_key}"
+                    headers = {"Content-Type": "application/json"}
+                    post_payload = {
+                        "contents": [{
+                            "parts": [{"text": desc_prompt}]
+                        }]
+                    }
+                    r = requests.post(url, json=post_payload, headers=headers, timeout=20)
+                    r.raise_for_status()
+                    res_data = r.json()
+                    ai_desc = res_data["candidates"][0]["content"]["parts"][0]["text"].strip().replace('"', '')
+                else:
+                    ollama_payload = {
+                        "model": TEXT_MODEL,
+                        "prompt": desc_prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.6,
+                            "num_predict": 30
+                        }
+                    }
+                    url = f"{OLLAMA_BASE_URL}/api/generate"
+                    r = requests.post(url, json=ollama_payload, timeout=20)
+                    r.raise_for_status()
+                    ai_desc = r.json().get("response", "").strip().replace('"', '')
+                return item["id"], ai_desc
+            except Exception as ex:
+                print(f"Failed description generation for {item['productName']}: {ex}")
+                return item["id"], None
+                
+        # Limit workers to 5 to avoid overloading local Ollama or hitting Gemini rate limits
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            thread_results = executor.map(_get_single_desc, remaining_items)
+            for item_id, ai_desc in thread_results:
+                if ai_desc:
+                    descriptions_map[item_id] = ai_desc
+                    
+    # 3. Write updates database-wise in a single connection transaction
+    updated_count = 0
+    from database import get_db_connection
+    conn = get_db_connection()
+    try:
+        for item in draft.get("items", []):
+            if item["id"] in descriptions_map:
+                item["description"] = descriptions_map[item["id"]]
+                item["reviewStatus"] = "Review Required"
+                update_draft_item(draft_id, item["id"], item, user="AI Description Generator", conn=conn)
+                updated_count += 1
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        raise exc
+    finally:
+        conn.close()
+        
     return {"status": "success", "updated": updated_count}
 
 @app.post("/api/drafts/{draft_id}/approve")
@@ -879,21 +1278,50 @@ def approve_and_export_menu(draft_id: str, payload: Dict[str, Any] = Body(...), 
         source_meta = it.get("source", {})
         initial_name = source_meta.get("initialProductName")
         final_name = it.get("productName")
-        if initial_name and final_name and initial_name != final_name:
-            save_learned_correction("product_name", initial_name, final_name)
-            
-        initial_cat = source_meta.get("initialCategory")
         final_cat = it.get("categoryName")
-        if initial_cat and final_cat and initial_cat != final_cat:
+        final_diet = it.get("dietaryTag")
+        
+        if initial_name and final_name:
+            # Save product name spelling correction if modified
+            if initial_name.strip() != final_name.strip():
+                save_learned_correction("product_name", initial_name, final_name)
+            
+            # Save product category classification
+            if final_cat:
+                save_learned_correction("product_category", final_name, final_cat)
+                
+            # Save product dietary tag
+            if final_diet:
+                save_learned_correction("product_dietary", final_name, final_diet)
+            
+        # Legacy
+        initial_cat = source_meta.get("initialCategory")
+        if initial_cat and final_cat and initial_cat.strip() != final_cat.strip():
             save_learned_correction("category", initial_cat, final_cat)
             
-    # Export excel using the dynamic template
+    # Determine output format and webhook URL for POS companies
+    output_format = "shopverse"
+    webhook_url = None
+    pos_company_id = draft.get("posCompanyId")
+    if pos_company_id:
+        from database import execute_query
+        rows = execute_query("SELECT company_name, output_format, webhook_url FROM pos_companies WHERE id = ?", (pos_company_id,))
+        if rows:
+            company_name, output_format, webhook_url = rows[0]
+
+    # Export using the dynamic POS exporter
     import re
     safe_business_name = re.sub(r'[\\/*?:"<>| ]', "_", draft['businessName'])
-    output_filename = f"{safe_business_name}_Menu_Ninja.xlsx"
-    output_path = OUTPUT_DIR / output_filename
     
-    export_approved_menu(DEFAULT_TEMPLATE, output_path, validated_items, draft["businessName"])
+    if output_format in ["urbanpiper", "json"]:
+        output_filename = f"{safe_business_name}_{output_format}_Menu.json"
+        mime_type = "application/json"
+    else:
+        output_filename = f"{safe_business_name}_{output_format}_Menu.xlsx"
+        mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        
+    output_path = OUTPUT_DIR / output_filename
+    export_pos_menu(output_format, validated_items, draft["businessName"], output_path)
     
     # Generate Review Report
     report_json_name = f"{safe_business_name}_review_report.json"
@@ -922,26 +1350,51 @@ def approve_and_export_menu(draft_id: str, payload: Dict[str, Any] = Body(...), 
                 txt_b64 = base64.b64encode(f.read()).decode("utf-8")
     except Exception as e:
         print(f"Error reading generated files for memory-routing: {e}")
-    finally:
-        # Delete output files to avoid cloud hosting disk usage
-        for p in [output_path, report_json_path, report_txt_path]:
-            if p.exists():
-                try:
-                    os.remove(p)
-                except Exception:
-                    pass
+
+    # Dispatch webhooks if registered
+    if webhook_url:
+        payload = {}
+        if output_format in ["urbanpiper", "json"]:
+            try:
+                import json
+                payload = json.loads(output_path.read_text(encoding="utf-8"))
+            except Exception:
+                payload = {"items": validated_items}
+        else:
+            # Excel
+            payload = {
+                "event": "menu.approved",
+                "business_name": draft["businessName"],
+                "draft_id": draft_id,
+                "company_name": pos_company_id,
+                "output_format": output_format,
+                "output_file_name": output_filename,
+                "file_content_base64": xlsx_b64,
+                "items": [it for it in validated_items if it.get("approved")]
+            }
+        
+        import threading
+        threading.Thread(target=trigger_webhook_task, args=(webhook_url, payload), daemon=True).start()
+
+    # Delete output files to avoid cloud hosting disk usage
+    for p in [output_path, report_json_path, report_txt_path]:
+        if p.exists():
+            try:
+                os.remove(p)
+            except Exception:
+                pass
 
     # Update Draft status to Approved
     execute_query("UPDATE drafts SET status = 'Approved' WHERE id = ?", (draft_id,), commit=True)
     
-    log_audit(draft_id, "EXPORT_MENU", f"Menu approved and Excel file generated: {output_filename}")
+    log_audit(draft_id, "EXPORT_MENU", f"Menu approved and output file generated in format '{output_format}': {output_filename}")
     
     return {
         "status": "success",
         "outputFile": output_filename,
         "reviewReportJson": report_json_name,
         "reviewReportTxt": report_txt_name,
-        "downloadOutputUrl": f"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{xlsx_b64}",
+        "downloadOutputUrl": f"data:{mime_type};base64,{xlsx_b64}",
         "downloadReviewReportJsonUrl": f"data:application/json;base64,{json_b64}",
         "downloadReviewReportTxtUrl": f"data:text/plain;base64,{txt_b64}"
     }

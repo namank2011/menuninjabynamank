@@ -772,11 +772,19 @@ def extract_directly_from_csv(path: Path) -> Optional[MenuExtraction]:
     return None
 
 
+_RAPID_OCR_ENGINE = None
+
+def _get_rapid_ocr_engine():
+    global _RAPID_OCR_ENGINE
+    if _RAPID_OCR_ENGINE is None:
+        from rapidocr_onnxruntime import RapidOCR
+        _RAPID_OCR_ENGINE = RapidOCR()
+    return _RAPID_OCR_ENGINE
+
 def extract_text_from_image_via_ocr(image_path: Path) -> str:
     # 1. Try RapidOCR first
     try:
-        from rapidocr_onnxruntime import RapidOCR
-        engine = RapidOCR()
+        engine = _get_rapid_ocr_engine()
         result, elapse = engine(str(image_path))
         if result:
             lines_data = []
@@ -979,7 +987,11 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
                 try:
                     print("Using Ollama for text PDF extraction...")
                     chunks = _chunk_text_by_lines(text, max_chars=3000)[:3]
-                    extractions = [extract_from_text_with_ollama(chunk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for chunk in chunks]
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(chunks), 3)) as executor:
+                        extractions = list(executor.map(
+                            lambda chk: extract_from_text_with_ollama(chk, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
+                            chunks
+                        ))
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
@@ -1018,7 +1030,11 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
             if use_ollama:
                 try:
                     print("Using Ollama for scanned PDF vision extraction...")
-                    extractions = [extract_from_image_with_ollama(img_path, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")) for img_path in image_paths[:3]]
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(image_paths), 3)) as executor:
+                        extractions = list(executor.map(
+                            lambda img_path: extract_from_image_with_ollama(img_path, api_key=gemini_key, bypass_to_gemini=(engine != "ollama")),
+                            image_paths[:3]
+                        ))
                     return merge_extractions(extractions)
                 except Exception as e:
                     if engine == "ollama":
@@ -1031,7 +1047,8 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
             if use_heuristics:
                 print("Using local OCR + Heuristics for scanned PDF...")
                 extracted = MenuExtraction(currency="INR", items=[], document_notes=["Local OCR + Heuristics failed to extract menu items from scanned PDF."])
-                ocr_texts = [extract_text_from_image_via_ocr(img_path) for img_path in image_paths]
+                with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(image_paths), 4)) as executor:
+                    ocr_texts = list(executor.map(extract_text_from_image_via_ocr, image_paths))
                 combined_text = "\n".join(ocr_texts)
                 if combined_text.strip():
                     heur = parse_menu_text_heuristically(combined_text)
@@ -1108,17 +1125,17 @@ def _extract_menu_from_file_raw(path: str | Path, engine: str = "auto", api_key:
 def apply_learned_corrections_to_extraction(extraction: MenuExtraction) -> MenuExtraction:
     try:
         from database import get_learned_corrections
-        cat_memory = get_learned_corrections("category")
         prod_memory = get_learned_corrections("product_name")
+        prod_cat_memory = get_learned_corrections("product_category")
+        prod_diet_memory = get_learned_corrections("product_dietary")
+        cat_memory = get_learned_corrections("category") # Legacy
     except Exception as e:
         print(f"Could not load learned memory for post-processing mapping: {e}")
         return extraction
 
-    if not cat_memory and not prod_memory:
-        return extraction
-
     for item in extraction.items:
-        # Match product name
+        p_name_lower = ""
+        # Match product name spelling correction
         if item.product_name:
             p_name_lower = item.product_name.lower().strip()
             if p_name_lower in prod_memory:
@@ -1126,14 +1143,44 @@ def apply_learned_corrections_to_extraction(extraction: MenuExtraction) -> MenuE
                 if item.product_name != corrected_name:
                     print(f"[Learning Memory] Auto-corrected product name: '{item.product_name}' -> '{corrected_name}'")
                     item.product_name = corrected_name
+                    p_name_lower = corrected_name.lower().strip()
+            
+            # Map product name -> category
+            if p_name_lower in prod_cat_memory:
+                corrected_cat = prod_cat_memory[p_name_lower]
+                if item.category != corrected_cat:
+                    print(f"[Learning Memory] Auto-corrected category for '{item.product_name}': '{item.category}' -> '{corrected_cat}'")
+                    item.category = corrected_cat
+            else:
+                # Substring matching fallback (for generic keywords)
+                for dict_pname, learned_cat in prod_cat_memory.items():
+                    if len(dict_pname) > 5 and dict_pname in p_name_lower:
+                        if item.category != learned_cat:
+                            print(f"[Learning Memory] Substring-matched category for '{item.product_name}': '{item.category}' -> '{learned_cat}'")
+                            item.category = learned_cat
+                            break
+                            
+            # Map product name -> dietary tag
+            if p_name_lower in prod_diet_memory:
+                corrected_diet = prod_diet_memory[p_name_lower]
+                if item.dietary_tag != corrected_diet:
+                    print(f"[Learning Memory] Auto-corrected dietary tag for '{item.product_name}': '{item.dietary_tag}' -> '{corrected_diet}'")
+                    item.dietary_tag = corrected_diet
+            else:
+                # Substring matching fallback for dietary tag
+                for dict_pname, learned_diet in prod_diet_memory.items():
+                    if len(dict_pname) > 4 and dict_pname in p_name_lower:
+                        if item.dietary_tag != learned_diet:
+                            item.dietary_tag = learned_diet
+                            break
         
-        # Match category name
-        if item.category:
+        # Match category name (legacy fallback)
+        if item.category and p_name_lower and not prod_cat_memory.get(p_name_lower):
             cat_lower = item.category.lower().strip()
             if cat_lower in cat_memory:
                 corrected_cat = cat_memory[cat_lower]
                 if item.category != corrected_cat:
-                    print(f"[Learning Memory] Auto-corrected category: '{item.category}' -> '{corrected_cat}'")
+                    print(f"[Learning Memory] Auto-corrected category (legacy): '{item.category}' -> '{corrected_cat}'")
                     item.category = corrected_cat
 
     return extraction

@@ -78,6 +78,7 @@ function switchView(viewName) {
         localStorage.removeItem('menu_ninja_draft_id');
         localStorage.removeItem('menu_ninja_step');
         clearUploadForm();
+        loadPOSCompanySelectOptions();
     } else if (viewName === 'users') {
         const usersBtn = document.getElementById('btn-users');
         if (usersBtn) usersBtn.classList.add('active');
@@ -88,6 +89,16 @@ function switchView(viewName) {
         localStorage.removeItem('menu_ninja_draft_id');
         localStorage.removeItem('menu_ninja_step');
         loadUsersList();
+    } else if (viewName === 'pos-integrations') {
+        const posBtn = document.getElementById('btn-pos-integrations');
+        if (posBtn) posBtn.classList.add('active');
+        document.getElementById('save-draft-btn').style.display = 'none';
+        document.getElementById('audit-log-toggle').style.display = 'none';
+        currentDraftId = null;
+        currentDraft = null;
+        localStorage.removeItem('menu_ninja_draft_id');
+        localStorage.removeItem('menu_ninja_step');
+        loadPOSCompaniesList();
     } else if (viewName === 'review-flow') {
         document.getElementById('save-draft-btn').style.display = 'inline-flex';
         document.getElementById('audit-log-toggle').style.display = 'inline-flex';
@@ -254,6 +265,10 @@ async function triggerExtraction(directApprove = false) {
         formData.append('default_dietary', document.getElementById('form-dietary').value);
         formData.append('direct_approve', directApprove);
         formData.append('extraction_engine', document.getElementById('form-extraction-engine').value);
+        const posCompanyVal = document.getElementById('form-pos-company').value;
+        if (posCompanyVal) {
+            formData.append('pos_company_id', posCompanyVal);
+        }
 
         const headers = {};
         const apiKey = localStorage.getItem("gemini_api_key");
@@ -1769,6 +1784,10 @@ function onLoginSuccess(user, googleClientId) {
     const usersBtn = document.getElementById('btn-users');
     if (usersBtn) usersBtn.style.display = isAdmin ? 'flex' : 'none';
 
+    // POS Integrations nav button: admin only
+    const posBtn = document.getElementById('btn-pos-integrations');
+    if (posBtn) posBtn.style.display = isAdmin ? 'flex' : 'none';
+
     // Settings button: admin only
     const settingsBtn = document.getElementById('btn-settings');
     if (settingsBtn) settingsBtn.style.display = isAdmin ? 'flex' : 'none';
@@ -2094,4 +2113,193 @@ window.handleAddUserSubmit = handleAddUserSubmit;
 window.toggleUserAccess = toggleUserAccess;
 window.deleteUserWhitelist = deleteUserWhitelist;
 window.onRoleSelectChange = onRoleSelectChange;
+
+// ----------------- POS INTEGRATIONS SYSTEM -----------------
+function toggleAddPOSModal() {
+    const modal = document.getElementById('add-pos-modal');
+    modal.style.display = modal.style.display === 'none' || !modal.style.display ? 'flex' : 'none';
+}
+
+function openAddPOSCompanyModal() {
+    document.getElementById('pos-modal-title').innerHTML = '<i class="fa-solid fa-link" style="margin-right:8px;"></i>Register POS Integration';
+    document.getElementById('pos-company-id-input').value = '';
+    document.getElementById('pos-company-name').value = '';
+    document.getElementById('pos-output-format').value = 'shopverse';
+    document.getElementById('pos-webhook-url').value = '';
+    document.getElementById('pos-api-key').value = '';
+    document.getElementById('pos-api-key').placeholder = 'Leave empty to auto-generate a secure token';
+    toggleAddPOSModal();
+}
+
+function openEditPOSCompanyModal(id, name, format, webhook, apiKey) {
+    document.getElementById('pos-modal-title').innerHTML = '<i class="fa-solid fa-pen-to-square" style="margin-right:8px;"></i>Edit POS Integration';
+    document.getElementById('pos-company-id-input').value = id;
+    document.getElementById('pos-company-name').value = name;
+    document.getElementById('pos-output-format').value = format;
+    document.getElementById('pos-webhook-url').value = webhook || '';
+    document.getElementById('pos-api-key').value = apiKey || '';
+    document.getElementById('pos-api-key').placeholder = 'API Key';
+    toggleAddPOSModal();
+}
+
+async function handlePOSSubmit(event) {
+    event.preventDefault();
+    const id = document.getElementById('pos-company-id-input').value;
+    const company_name = document.getElementById('pos-company-name').value.trim();
+    const output_format = document.getElementById('pos-output-format').value;
+    const webhook_url = document.getElementById('pos-webhook-url').value.trim();
+    const api_key = document.getElementById('pos-api-key').value.trim();
+
+    const payload = {
+        company_name,
+        output_format,
+        webhook_url: webhook_url || null,
+        api_key: api_key || null
+    };
+
+    try {
+        let res;
+        if (id) {
+            // Edit
+            res = await fetch(`/api/admin/pos-companies/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } else {
+            // Create
+            res = await fetch('/api/admin/pos-companies', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        if (res.ok) {
+            showToast(id ? 'POS company integration updated successfully!' : 'POS company registered successfully!', 'success');
+            toggleAddPOSModal();
+            loadPOSCompaniesList();
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Failed to save POS integration details.', 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+async function loadPOSCompaniesList() {
+    const tbody = document.getElementById('pos-companies-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading registered POS systems...</td></tr>`;
+
+    try {
+        const res = await fetch('/api/admin/pos-companies');
+        if (res.ok) {
+            const companies = await res.json();
+            if (companies.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No POS integrations found. Register your first POS company to get started.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = companies.map(c => {
+                const badgeClass = 'pos-badge';
+                const keyFormatted = c.api_key;
+                const escName = escapeHtml(c.company_name);
+                const escFormat = escapeHtml(c.output_format);
+                const escWebhook = c.webhook_url ? escapeHtml(c.webhook_url) : '<span class="status-badge-inactive">None</span>';
+
+                return `<tr>
+                    <td><strong>${escName}</strong></td>
+                    <td style="font-family: monospace;">
+                        <span>${keyFormatted}</span>
+                        <button class="pos-key-copy-btn" onclick="copyPOSApiKey('${c.api_key}')">
+                            <i class="fa-solid fa-copy"></i> Copy
+                        </button>
+                    </td>
+                    <td><span class="${badgeClass}">${escFormat}</span></td>
+                    <td class="text-muted" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escWebhook}</td>
+                    <td>
+                        <button onclick="openEditPOSCompanyModal('${c.id}', '${escapeJsStr(c.company_name)}', '${c.output_format}', '${escapeJsStr(c.webhook_url || "")}', '${c.api_key}')" class="secondary-btn btn-sm" style="margin-right: 6px;">
+                            <i class="fa-solid fa-edit"></i> Edit
+                        </button>
+                        <button onclick="deletePOSCompany('${c.id}')" class="danger-btn btn-sm">
+                            <i class="fa-solid fa-trash"></i> Delete
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } else {
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state error-text">Failed to retrieve POS integrations list.</td></tr>`;
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state error-text">Connection error: ${e.message}</td></tr>`;
+    }
+}
+
+async function loadPOSCompanySelectOptions() {
+    const select = document.getElementById('form-pos-company');
+    if (!select) return;
+
+    // Clear existing dynamic options but keep the first one
+    select.innerHTML = '<option value="" selected>None (Standard ShopVerse format)</option>';
+
+    try {
+        const res = await fetch('/api/admin/pos-companies');
+        if (res.ok) {
+            const companies = await res.json();
+            companies.forEach(company => {
+                const opt = document.createElement('option');
+                opt.value = company.id;
+                opt.textContent = `${company.company_name} (${company.output_format.toUpperCase()})`;
+                select.appendChild(opt);
+            });
+        }
+    } catch (e) {
+        console.error("Failed to load POS partner options:", e);
+    }
+}
+
+async function deletePOSCompany(id) {
+    if (!confirm('Are you sure you want to permanently delete this POS company integration and revoke its API key?')) {
+        return;
+    }
+    try {
+        const res = await fetch(`/api/admin/pos-companies/${id}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            showToast('POS integration removed successfully.', 'success');
+            loadPOSCompaniesList();
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Failed to remove POS integration.', 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+function copyPOSApiKey(key) {
+    navigator.clipboard.writeText(key).then(() => {
+        showToast('POS API key copied to clipboard!', 'success');
+    }).catch(err => {
+        showToast('Failed to copy API key: ' + err, 'error');
+    });
+}
+
+function escapeJsStr(str) {
+    if (!str) return '';
+    return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+// Window bindings
+window.toggleAddPOSModal = toggleAddPOSModal;
+window.openAddPOSCompanyModal = openAddPOSCompanyModal;
+window.openEditPOSCompanyModal = openEditPOSCompanyModal;
+window.handlePOSSubmit = handlePOSSubmit;
+window.loadPOSCompaniesList = loadPOSCompaniesList;
+window.loadPOSCompanySelectOptions = loadPOSCompanySelectOptions;
+window.deletePOSCompany = deletePOSCompany;
+window.copyPOSApiKey = copyPOSApiKey;
 

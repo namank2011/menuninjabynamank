@@ -312,3 +312,243 @@ AUDIT LOG (LAST 20 LOGS)
 
 def newline_join(lst: List[str]) -> str:
     return "\n".join(lst)
+
+
+def export_petpooja_format(items: List[Dict[str, Any]], business_name: str, output_path: Path) -> Path:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Petpooja Menu"
+    
+    headers = [
+        "Category", "Item Name", "Price", "Description", "VegType (veg/non veg/egg)", 
+        "Tax Category", "Tax (%)", "Item Code", "Variations (Name:Price)"
+    ]
+    ws.append(headers)
+    
+    header_font = Font(name="Outfit", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(fill_type="solid", start_color="4A5D23", end_color="4A5D23")
+    header_align = Alignment(horizontal="center", vertical="center")
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        
+    approved_items = [it for it in items if it.get("approved")]
+    for row_idx, item in enumerate(approved_items, start=2):
+        variations = item.get("variations", [])
+        var_strs = []
+        for v in variations:
+            if v.get("name"):
+                var_strs.append(f"{v.get('name')}:{v.get('sellingPrice') or v.get('price') or 0}")
+        var_val = "#".join(var_strs) if var_strs else ""
+        
+        price_val = 0
+        if not var_val and variations:
+            price_val = variations[0].get("sellingPrice") or variations[0].get("price") or 0
+        elif not var_val:
+            price_val = 0
+            
+        dietary_tag = str(item.get("dietaryTag", "veg")).lower()
+        if "non" in dietary_tag:
+            vg_type = "non veg"
+        elif "egg" in dietary_tag:
+            vg_type = "egg"
+        else:
+            vg_type = "veg"
+            
+        row_data = [
+            item.get("categoryName", "Uncategorized"),
+            item.get("productName", ""),
+            price_val,
+            item.get("description", ""),
+            vg_type,
+            item.get("taxCategory", "Services"),
+            item.get("taxValue", 5.0),
+            item.get("itemCode", ""),
+            var_val
+        ]
+        ws.append(row_data)
+        
+        for col_num in range(1, len(row_data) + 1):
+            cell = ws.cell(row=row_idx, column=col_num)
+            if col_num in [3, 7]:
+                cell.alignment = Alignment(horizontal="right")
+            elif col_num in [5, 6, 8]:
+                cell.alignment = Alignment(horizontal="center")
+            else:
+                cell.alignment = Alignment(horizontal="left")
+                
+    for col_idx in range(1, len(headers) + 1):
+        letter = get_column_letter(col_idx)
+        ws.column_dimensions[letter].width = 20
+        
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(output_path))
+    wb.close()
+    return output_path
+
+
+def export_slickpos_format(items: List[Dict[str, Any]], business_name: str, output_path: Path) -> Path:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "SlickPOS Menu"
+    
+    headers = [
+        "Product Name", "Category", "Price", "Description", "Food Type", 
+        "Tax Name", "Tax Percentage", "SKU / Item Code"
+    ]
+    ws.append(headers)
+    
+    header_font = Font(name="Outfit", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(fill_type="solid", start_color="1F385C", end_color="1F385C")
+    header_align = Alignment(horizontal="center", vertical="center")
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        
+    approved_items = [it for it in items if it.get("approved")]
+    for row_idx, item in enumerate(approved_items, start=2):
+        variations = item.get("variations", [])
+        price_val = 0
+        if variations:
+            price_val = variations[0].get("sellingPrice") or variations[0].get("price") or 0
+            
+        dietary_tag = str(item.get("dietaryTag", "veg")).lower()
+        if "non" in dietary_tag:
+            vg_type = "Non Veg"
+        elif "egg" in dietary_tag:
+            vg_type = "Egg"
+        else:
+            vg_type = "Veg"
+            
+        row_data = [
+            item.get("productName", ""),
+            item.get("categoryName", "Uncategorized"),
+            price_val,
+            item.get("description", ""),
+            vg_type,
+            item.get("taxType", "GST"),
+            item.get("taxValue", 5.0),
+            item.get("itemCode", "")
+        ]
+        ws.append(row_data)
+        
+        for col_num in range(1, len(row_data) + 1):
+            cell = ws.cell(row=row_idx, column=col_num)
+            if col_num in [3, 7]:
+                cell.alignment = Alignment(horizontal="right")
+            elif col_num in [5, 6, 8]:
+                cell.alignment = Alignment(horizontal="center")
+            else:
+                cell.alignment = Alignment(horizontal="left")
+                
+    for col_idx in range(1, len(headers) + 1):
+        letter = get_column_letter(col_idx)
+        ws.column_dimensions[letter].width = 20
+        
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(output_path))
+    wb.close()
+    return output_path
+
+
+def export_urbanpiper_format(items: List[Dict[str, Any]], business_name: str, output_path: Path) -> Path:
+    categories_map = {}
+    approved_items = [it for it in items if it.get("approved")]
+    
+    for item in approved_items:
+        cat_name = item.get("categoryName", "Uncategorized")
+        if cat_name not in categories_map:
+            categories_map[cat_name] = []
+            
+        variations = item.get("variations", [])
+        variants_list = []
+        for v in variations:
+            variants_list.append({
+                "name": v.get("name") or "Regular",
+                "price": float(v.get("sellingPrice") or v.get("price") or 0)
+            })
+            
+        item_price = float(variations[0].get("sellingPrice") or variations[0].get("price") or 0) if variations else 0.0
+        
+        dietary_tag = str(item.get("dietaryTag", "veg")).lower()
+        if "non" in dietary_tag:
+            food_type = "Non-Veg"
+        elif "egg" in dietary_tag:
+            food_type = "Egg"
+        else:
+            food_type = "Veg"
+            
+        categories_map[cat_name].append({
+            "title": item.get("productName", ""),
+            "description": item.get("description", ""),
+            "price": item_price,
+            "ref_id": item.get("id", ""),
+            "food_type": food_type,
+            "active": item.get("masterStatus", "Active") == "Active",
+            "variants": variants_list,
+            "tax_rate": float(item.get("taxValue", 5.0))
+        })
+        
+    urban_piper_categories = []
+    for cat_name, product_list in categories_map.items():
+        urban_piper_categories.append({
+            "name": cat_name,
+            "items": product_list
+        })
+        
+    payload = {
+        "business_name": business_name,
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "categories": urban_piper_categories
+    }
+    
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return output_path
+
+
+def export_generic_json(items: List[Dict[str, Any]], business_name: str, output_path: Path) -> Path:
+    approved_items = [it for it in items if it.get("approved")]
+    payload = {
+        "business_name": business_name,
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "items": approved_items
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return output_path
+
+
+def export_pos_menu(
+    output_format: str,
+    items: List[Dict[str, Any]],
+    business_name: str,
+    output_path: Path,
+    template_path: Path = None
+) -> Path:
+    fmt = str(output_format).strip().lower()
+    if fmt == "petpooja":
+        return export_petpooja_format(items, business_name, output_path)
+    elif fmt == "slickpos":
+        return export_slickpos_format(items, business_name, output_path)
+    elif fmt == "urbanpiper":
+        return export_urbanpiper_format(items, business_name, output_path)
+    elif fmt == "json":
+        return export_generic_json(items, business_name, output_path)
+    else:
+        # ShopVerse fallback
+        local_template = template_path or Path(__file__).resolve().parent / "templates" / "Bulk_Upload_Sheet_Format.xlsx"
+        return export_approved_menu(local_template, output_path, items, business_name)
+
