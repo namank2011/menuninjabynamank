@@ -42,8 +42,13 @@ from ollama_client import OLLAMA_BASE_URL, TEXT_MODEL, REQUEST_TIMEOUT_SECONDS
 import requests
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-OUTPUT_DIR = BASE_DIR / "outputs"
+IS_VERCEL = os.getenv("VERCEL") or os.getenv("VERCEL_ENV")
+if IS_VERCEL:
+    UPLOAD_DIR = Path("/tmp") / "uploads"
+    OUTPUT_DIR = Path("/tmp") / "outputs"
+else:
+    UPLOAD_DIR = BASE_DIR / "uploads"
+    OUTPUT_DIR = BASE_DIR / "outputs"
 DEFAULT_TEMPLATE = Path(__file__).resolve().parent / "templates" / "Bulk_Upload_Sheet_Format.xlsx"
 FRONTEND_DIR = BASE_DIR / "frontend"
 

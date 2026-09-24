@@ -6,7 +6,11 @@ import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-DB_FILE = Path(__file__).resolve().parent.parent / "outputs" / "shopverse_agent.db"
+IS_VERCEL = os.getenv("VERCEL") or os.getenv("VERCEL_ENV")
+if IS_VERCEL:
+    DB_FILE = Path("/tmp") / "shopverse_agent.db"
+else:
+    DB_FILE = Path(__file__).resolve().parent.parent / "outputs" / "shopverse_agent.db"
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_db_connection():
