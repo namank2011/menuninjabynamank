@@ -22,12 +22,12 @@ TEXT_MODEL = os.getenv("OLLAMA_TEXT_MODEL", "llama3.1:latest")
 VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "llava:latest")
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT", "300"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
 GEMINI_FALLBACK_MODELS = [
     model.strip()
     for model in os.getenv(
         "GEMINI_FALLBACK_MODELS",
-        "gemini-3.7-flash,gemini-3.5-flash,gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro",
+        "gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro",
     ).split(",")
     if model.strip()
 ]
