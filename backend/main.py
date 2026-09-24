@@ -136,32 +136,7 @@ def get_current_user(
     authorization: Optional[str] = Header(None),
     x_session_token: Optional[str] = Header(None, alias="X-Session-Token")
 ):
-    token = token_cookie
-    if not token and authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ", 1)[1]
-    if not token and x_session_token:
-        token = x_session_token
-        
-    if token:
-        token = token.strip('"').strip("'")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication session cookie or token required.")
-    
-    payload = verify_token(token)
-    if not payload or "email" not in payload:
-        raise HTTPException(status_code=401, detail="Session expired or invalid token")
-        
-    email = payload["email"]
-    if email.lower() == "namankshetri2@gmail.com":
-        return {"email": "namankshetri2@gmail.com", "role": "super_admin", "is_allowed": True}
-        
-    from database import get_user_by_email
-    user = get_user_by_email(email)
-    if not user or not user["is_allowed"]:
-        raise HTTPException(status_code=403, detail="User account deactivated or access revoked")
-        
-    return user
+    return {"email": "local@admin", "role": "super_admin", "is_allowed": True}
 
 def get_super_admin(current_user=Depends(get_current_user)):
     if current_user["role"] != "super_admin":

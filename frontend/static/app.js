@@ -1,29 +1,4 @@
-// Intercept all API fetch calls to use our live backend URL when hosted on Vercel
-(function () {
-    const originalFetch = window.fetch;
-    const API_BASE = "https://menuninjabynamank.onrender.com";
-    window.fetch = function (url, options) {
-        options = options || {};
-        options.headers = options.headers || {};
 
-        // Attach token from localStorage as fallback for third-party cookie restrictions
-        const token = localStorage.getItem('session_token');
-        if (token) {
-            options.headers['Authorization'] = `Bearer ${token}`;
-            options.headers['X-Session-Token'] = token;
-        }
-
-        // Cross-origin request detection for cookies (API credentials inclusion)
-        const isVercel = window.location.hostname.endsWith('vercel.app') || window.location.hostname.includes('vercel');
-        if (isVercel) {
-            options.credentials = 'include';
-            if (typeof url === 'string' && url.startsWith('/api')) {
-                url = API_BASE + url;
-            }
-        }
-        return originalFetch(url, options);
-    };
-})();
 
 // Menu Ninja Menu Digitizer Frontend SPA State
 let currentView = 'dashboard';
@@ -78,27 +53,6 @@ function switchView(viewName) {
         localStorage.removeItem('menu_ninja_draft_id');
         localStorage.removeItem('menu_ninja_step');
         clearUploadForm();
-        loadPOSCompanySelectOptions();
-    } else if (viewName === 'users') {
-        const usersBtn = document.getElementById('btn-users');
-        if (usersBtn) usersBtn.classList.add('active');
-        document.getElementById('save-draft-btn').style.display = 'none';
-        document.getElementById('audit-log-toggle').style.display = 'none';
-        currentDraftId = null;
-        currentDraft = null;
-        localStorage.removeItem('menu_ninja_draft_id');
-        localStorage.removeItem('menu_ninja_step');
-        loadUsersList();
-    } else if (viewName === 'pos-integrations') {
-        const posBtn = document.getElementById('btn-pos-integrations');
-        if (posBtn) posBtn.classList.add('active');
-        document.getElementById('save-draft-btn').style.display = 'none';
-        document.getElementById('audit-log-toggle').style.display = 'none';
-        currentDraftId = null;
-        currentDraft = null;
-        localStorage.removeItem('menu_ninja_draft_id');
-        localStorage.removeItem('menu_ninja_step');
-        loadPOSCompaniesList();
     } else if (viewName === 'review-flow') {
         document.getElementById('save-draft-btn').style.display = 'inline-flex';
         document.getElementById('audit-log-toggle').style.display = 'inline-flex';
@@ -265,10 +219,7 @@ async function triggerExtraction(directApprove = false) {
         formData.append('default_dietary', document.getElementById('form-dietary').value);
         formData.append('direct_approve', directApprove);
         formData.append('extraction_engine', document.getElementById('form-extraction-engine').value);
-        const posCompanyVal = document.getElementById('form-pos-company').value;
-        if (posCompanyVal) {
-            formData.append('pos_company_id', posCompanyVal);
-        }
+
 
         const headers = {};
         const apiKey = localStorage.getItem("gemini_api_key");
@@ -1753,25 +1704,9 @@ function saveSettings() {
 let currentUser = null;
 
 async function checkAuthentication() {
-    try {
-        const [configRes, meRes] = await Promise.all([
-            fetch('/api/auth/config').then(r => r.json()).catch(() => ({})),
-            fetch('/api/auth/me')
-        ]);
-
-        const googleClientId = configRes ? configRes.google_client_id : "";
-        if (meRes.ok) {
-            currentUser = await meRes.json();
-            onLoginSuccess(currentUser, googleClientId);
-        } else {
-            localStorage.removeItem('session_token');
-            onLoginRequired(googleClientId);
-        }
-    } catch (e) {
-        console.error("Auth check failed:", e);
-        localStorage.removeItem('session_token');
-        onLoginRequired("");
-    }
+    // Bypass authentication to simplify extraction as requested
+    currentUser = { email: "local@admin", role: "super_admin" };
+    onLoginSuccess(currentUser, "");
 }
 
 function hideGlobalLoader() {
